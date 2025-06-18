@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dragon Tiger Game</title>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
+    <style>
+        body { font-family: Arial; text-align: center; background: linear-gradient(to bottom, #1a2980, #26d0ce); color: white; min-height: 100vh; margin: 0; padding: 20px; }
+        .game-container { max-width: 600px; margin: 0 auto; background: rgba(0, 0, 0, 0.7); padding: 20px; border-radius: 15px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        h1 { font-size: 2.5em; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        .cards { display: flex; justify-content: center; gap: 30px; margin: 30px 0; }
+        .card { width: 100px; height: 150px; background: #f8f8f8; color: #333; font-size: 40px; display: flex; align-items: center; justify-content: center; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .bet-options { display: flex; justify-content: center; gap: 15px; margin: 20px 0; }
+        button { padding: 15px 25px; font-size: 18px; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; transition: all 0.3s; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        button:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0,0,0.3); }
+        button:active { transform: translateY(1px); }
+        #dragonBtn { background: linear-gradient(to bottom, #ff416c, #ff4b2b); color: white; }
+        #tigerBtn { background: linear-gradient(to bottom, #11998e, #38ef7d); color: white; }
+        #tieBtn { background: linear-gradient(to bottom, #654ea3, #da98b4); color: white; }
+        #result { font-size: 24px; font-weight: bold; min-height: 40px; margin: 20px 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+        .points-container { font-size: 22px; margin: 20px 0; }
+        #points { font-size: 28px; font-weight: bold; color: #ffd700; }
+        .card-value { font-size: 36px; font-weight: bold; margin-top: 10px; }
+        .dragon { color: #ff416c; }
+        .tiger { color: #11998e; }
+        .win { color: #4CAF50; animation: pulse 0.5s; }
+        .lose { color: #f44336; }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🐉 Dragon vs Tiger 🐅</h1>
+        
+        <div class="cards">
+            <div>
+                <div id="dragonCard" class="card">🐉</div>
+                <div id="dragonValue" class="card-value dragon"></div>
+            </div>
+            <div>
+                <div id="tigerCard" class="card">🐅</div>
+                <div id="tigerValue" class="card-value tiger"></div>
+            </div>
+        </div>
+        
+        <div id="result">Place your bet!</div>
+        
+        <div class="bet-options">
+            <button id="dragonBtn" onclick="bet('dragon')">Bet on Dragon</button>
+            <button id="tieBtn" onclick="bet('tie')">Bet on Tie</button>
+            <button id="tigerBtn" onclick="bet('tiger')">Bet on Tiger</button>
+        </div>
+        
+        <div class="points-container">
+            Your Points: <span id="points">0</span>
+        </div>
+    </div>
+
+    <script>
+        // Firebase Config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBO7dxMxJwcSEceULVYH0K6n8d59wALw7U",
+            authDomain: "dragon-tiger-game-8b5b0.firebaseapp.com",
+            projectId: "dragon-tiger-game-8b5b0",
+            storageBucket: "dragon-tiger-game-8b5b0.firebasestorage.app",
+            messagingSenderId: "885603497015",
+            appId: "1:885603497015:web:afc57007437a3166ecfbb2"
+        };
+        
+        // Initialize Firebase
+        try {
+            firebase.initializeApp(firebaseConfig);
+        } catch (e) {
+            console.error("Firebase init error:", e);
+        }
+        
+        const db = firebase.firestore();
+        let currentUser = null;
+
+        // Load user points
+        firebase.auth().onAuthStateChanged(user => {
+            if (user) {
+                currentUser = user;
+                db.collection("users").doc(user.uid).get()
+                    .then(doc => {
+                        if (doc.exists) {
+                            document.getElementById("points").innerText = doc.data().points;
+                        } else {
+                            // Create user document if not exists
+                            db.collection("users").doc(user.uid).set({
+                                points: 1000,
+                                email: user.email
+                            }).then(() => {
+                                document.getElementById("points").innerText = 1000;
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Error loading user data:", error);
+                        document.getElementById("result").innerText = "Error loading points";
+                    });
+            } else {
+                window.location.href = "index.html"; // Redirect if not logged in
+            }
+        });
+
+        // Betting function
+        function bet(choice) {
+            if (!currentUser) return;
+            
+            const pointsEl = document.getElementById("points");
+            let points = parseInt(pointsEl.innerText);
+            const resultEl = document.getElementById("result");
+            
+            if (points < 50) {
+                resultEl.innerText = "Not enough points to bet!";
+                resultEl.className = "lose";
+                return;
+            }
+            
+            // Disable buttons during bet processing
+            document.getElementById("dragonBtn").disabled = true;
+            document.getElementById("tigerBtn").disabled = true;
+            document.getElementById("tieBtn").disabled = true;
+            
+            // Generate random cards
+            const dragon = Math.floor(Math.random() * 13) + 1;
+            const tiger = Math.floor(Math.random() * 13) + 1;
+            
+            // Display card values
+            document.getElementById("dragonValue").innerText = dragon;
+            document.getElementById("tigerValue").innerText = tiger;
+            
+            // Check for win/loss
+            let win = false;
+            if (choice === 'dragon' && dragon > tiger) win = true;
+            if (choice === 'tiger' && tiger > dragon) win = true;
+            if (choice === 'tie' && dragon === tiger) win = true;
+            
+            // Update points
+            if (win) {
+                points += 100;
+                resultEl.innerText = "You won! +100 points";
+                resultEl.className = "win";
+            } else {
+                points -= 50;
+                resultEl.innerText = "You lost! -50 points";
+                resultEl.className = "lose";
+            }
+            
+            // Update display
+            pointsEl.innerText = points;
+            
+            // Save points to Firebase
+            db.collection("users").doc(currentUser.uid).update({ points: points })
+                .catch(error => {
+                    console.error("Error saving points:", error);
+                    resultEl.innerText += " (Save error)";
+                })
+                .finally(() => {
+                    // Re-enable buttons after 1.5 seconds
+                    setTimeout(() => {
+                        document.getElementById("dragonBtn").disabled = false;
+                        document.getElementById("tigerBtn").disabled = false;
+                        document.getElementById("tieBtn").disabled = false;
+                    }, 1500);
+                });
+        }
+    </script>
+</body>
+</html>

@@ -6,36 +6,101 @@
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
     <style>
-        body { font-family: Arial; text-align: center; background: linear-gradient(to bottom, #1a2980, #26d0ce); color: white; min-height: 100vh; margin: 0; padding: 20px; }
-        .game-container { max-width: 600px; margin: 0 auto; background: rgba(0, 0, 0, 0.7); padding: 20px; border-radius: 15px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-        h1 { font-size: 2.5em; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-        .cards { display: flex; justify-content: center; gap: 30px; margin: 30px 0; }
-        .card { width: 100px; height: 150px; background: #f8f8f8; color: #333; font-size: 40px; display: flex; align-items: center; justify-content: center; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
-        .bet-options { display: flex; justify-content: center; gap: 15px; margin: 20px 0; }
-        button { padding: 15px 25px; font-size: 18px; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; transition: all 0.3s; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
-        button:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0,0,0.3); }
-        button:active { transform: translateY(1px); }
-        #dragonBtn { background: linear-gradient(to bottom, #ff416c, #ff4b2b); color: white; }
-        #tigerBtn { background: linear-gradient(to bottom, #11998e, #38ef7d); color: white; }
-        #tieBtn { background: linear-gradient(to bottom, #654ea3, #da98b4); color: white; }
-        #result { font-size: 24px; font-weight: bold; min-height: 40px; margin: 20px 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
-        .points-container { font-size: 22px; margin: 20px 0; }
-        #points { font-size: 28px; font-weight: bold; color: #ffd700; }
-        .card-value { font-size: 36px; font-weight: bold; margin-top: 10px; }
-        .dragon { color: #ff416c; }
-        .tiger { color: #11998e; }
-        .win { color: #4CAF50; animation: pulse 0.5s; }
-        .lose { color: #f44336; }
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
+        /* ... (existing styles remain the same) ... */
+        
+        /* New styles for timers and bet controls */
+        .timer-container {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 20px 0;
+        }
+        
+        .timer {
+            font-size: 24px;
+            font-weight: bold;
+            padding: 10px 20px;
+            border-radius: 50px;
+            background: rgba(0, 0, 0, 0.5);
+        }
+        
+        #betTimer {
+            color: #3498db;
+        }
+        
+        #resultTimer {
+            color: #e74c3c;
+        }
+        
+        .bet-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px 0;
+        }
+        
+        .bet-amount {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        #betAmount {
+            padding: 12px;
+            width: 120px;
+            font-size: 18px;
+            text-align: center;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        
+        .history-container {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+        }
+        
+        .history-item {
+            padding: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 14px;
+        }
+        
+        .history-win {
+            color: #2ecc71;
+        }
+        
+        .history-loss {
+            color: #e74c3c;
+        }
+        
+        .blocked-message {
+            background: rgba(231, 76, 60, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
     <div class="game-container">
         <h1>🐉 Dragon vs Tiger 🐅</h1>
+        
+        <div class="timer-container">
+            <div class="timer">
+                Bet Time: <span id="betTimer">30</span>s
+            </div>
+            <div class="timer">
+                Result Time: <span id="resultTimer">5</span>s
+            </div>
+        </div>
         
         <div class="cards">
             <div>
@@ -50,14 +115,29 @@
         
         <div id="result">Place your bet!</div>
         
-        <div class="bet-options">
-            <button id="dragonBtn" onclick="bet('dragon')">Bet on Dragon</button>
-            <button id="tieBtn" onclick="bet('tie')">Bet on Tie</button>
-            <button id="tigerBtn" onclick="bet('tiger')">Bet on Tiger</button>
+        <div id="blockedMessage" class="blocked-message" style="display: none;">
+            Your account has been blocked. Please contact support.
+        </div>
+        
+        <div class="bet-controls">
+            <div class="bet-amount">
+                <label for="betAmount">Bet Amount:</label>
+                <input type="number" id="betAmount" min="1" value="50">
+            </div>
+            
+            <div class="bet-options">
+                <button id="dragonBtn" onclick="placeBet('dragon')">Bet on Dragon</button>
+                <button id="tieBtn" onclick="placeBet('tie')">Bet on Tie</button>
+                <button id="tigerBtn" onclick="placeBet('tiger')">Bet on Tiger</button>
+            </div>
         </div>
         
         <div class="points-container">
             Your Points: <span id="points">0</span>
+        </div>
+        
+        <div class="history-container" id="betHistory">
+            <div class="history-item">Your bet history will appear here</div>
         </div>
     </div>
 
@@ -73,61 +153,106 @@
         };
         
         // Initialize Firebase
-        try {
-            firebase.initializeApp(firebaseConfig);
-        } catch (e) {
-            console.error("Firebase init error:", e);
-        }
-        
+        firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         let currentUser = null;
+        let userPoints = 0;
+        let userBlocked = false;
+        let betTimer, resultTimer;
+        let betTime = 30;
+        let resultTime = 5;
+        let gameActive = false;
+        let currentBet = null;
 
-        // Load user points
+        // Load user data and start game
         firebase.auth().onAuthStateChanged(user => {
             if (user) {
                 currentUser = user;
-                db.collection("users").doc(user.uid).get()
-                    .then(doc => {
-                        if (doc.exists) {
-                            document.getElementById("points").innerText = doc.data().points;
+                db.collection("users").doc(user.uid).onSnapshot(doc => {
+                    if (doc.exists) {
+                        const userData = doc.data();
+                        userPoints = userData.points || 0;
+                        userBlocked = userData.isBlocked || false;
+                        
+                        document.getElementById("points").innerText = userPoints;
+                        
+                        // Show/hide blocked message
+                        if (userBlocked) {
+                            document.getElementById("blockedMessage").style.display = "block";
+                            disableGame();
                         } else {
-                            // Create user document if not exists
-                            db.collection("users").doc(user.uid).set({
-                                points: 1000,
-                                email: user.email
-                            }).then(() => {
-                                document.getElementById("points").innerText = 1000;
-                            });
+                            document.getElementById("blockedMessage").style.display = "none";
+                            if (!gameActive) startGame();
                         }
-                    })
-                    .catch(error => {
-                        console.error("Error loading user data:", error);
-                        document.getElementById("result").innerText = "Error loading points";
-                    });
+                    }
+                });
+                
+                // Load bet history
+                loadUserBetHistory();
             } else {
-                window.location.href = "index.html"; // Redirect if not logged in
+                window.location.href = "index.html";
             }
         });
 
-        // Betting function
-        function bet(choice) {
-            if (!currentUser) return;
+        // Start the game round
+        function startGame() {
+            gameActive = true;
+            resetGame();
+            startBetTimer();
+        }
+
+        // Reset game state
+        function resetGame() {
+            document.getElementById("dragonValue").innerText = "";
+            document.getElementById("tigerValue").innerText = "";
+            document.getElementById("result").innerText = "Place your bet!";
+            document.getElementById("result").className = "";
+            currentBet = null;
             
-            const pointsEl = document.getElementById("points");
-            let points = parseInt(pointsEl.innerText);
-            const resultEl = document.getElementById("result");
+            // Enable buttons
+            document.getElementById("dragonBtn").disabled = false;
+            document.getElementById("tigerBtn").disabled = false;
+            document.getElementById("tieBtn").disabled = false;
             
-            if (points < 50) {
-                resultEl.innerText = "Not enough points to bet!";
-                resultEl.className = "lose";
-                return;
-            }
-            
-            // Disable buttons during bet processing
+            // Reset timers
+            betTime = 30;
+            resultTime = 5;
+            document.getElementById("betTimer").innerText = betTime;
+            document.getElementById("resultTimer").innerText = resultTime;
+        }
+
+        // Start the betting timer
+        function startBetTimer() {
+            clearInterval(betTimer);
+            betTimer = setInterval(() => {
+                betTime--;
+                document.getElementById("betTimer").innerText = betTime;
+                
+                if (betTime <= 0) {
+                    clearInterval(betTimer);
+                    endBettingPhase();
+                }
+            }, 1000);
+        }
+
+        // End betting phase
+        function endBettingPhase() {
+            // Disable buttons
             document.getElementById("dragonBtn").disabled = true;
             document.getElementById("tigerBtn").disabled = true;
             document.getElementById("tieBtn").disabled = true;
             
+            // Process any placed bet
+            if (currentBet) {
+                processBet();
+            } else {
+                document.getElementById("result").innerText = "No bet placed!";
+                startResultTimer();
+            }
+        }
+
+        // Process the bet
+        function processBet() {
             // Generate random cards
             const dragon = Math.floor(Math.random() * 13) + 1;
             const tiger = Math.floor(Math.random() * 13) + 1;
@@ -138,37 +263,153 @@
             
             // Check for win/loss
             let win = false;
-            if (choice === 'dragon' && dragon > tiger) win = true;
-            if (choice === 'tiger' && tiger > dragon) win = true;
-            if (choice === 'tie' && dragon === tiger) win = true;
+            if (currentBet.choice === 'dragon' && dragon > tiger) win = true;
+            if (currentBet.choice === 'tiger' && tiger > dragon) win = true;
+            if (currentBet.choice === 'tie' && dragon === tiger) win = true;
             
-            // Update points
+            // Calculate points change
+            const pointsChange = win ? currentBet.amount * 2 : -currentBet.amount;
+            userPoints += pointsChange;
+            
+            // Update UI
+            document.getElementById("points").innerText = userPoints;
+            
             if (win) {
-                points += 100;
-                resultEl.innerText = "You won! +100 points";
-                resultEl.className = "win";
+                document.getElementById("result").innerText = `You won ${currentBet.amount * 2} points!`;
+                document.getElementById("result").className = "win";
             } else {
-                points -= 50;
-                resultEl.innerText = "You lost! -50 points";
-                resultEl.className = "lose";
+                document.getElementById("result").innerText = `You lost ${currentBet.amount} points!`;
+                document.getElementById("result").className = "lose";
             }
             
-            // Update display
-            pointsEl.innerText = points;
+            // Save to Firestore
+            db.collection("users").doc(currentUser.uid).update({ 
+                points: userPoints 
+            });
             
-            // Save points to Firebase
-            db.collection("users").doc(currentUser.uid).update({ points: points })
-                .catch(error => {
-                    console.error("Error saving points:", error);
-                    resultEl.innerText += " (Save error)";
+            // Save bet history
+            saveBetHistory(win, pointsChange);
+            
+            // Start result timer
+            startResultTimer();
+        }
+
+        // Start result timer
+        function startResultTimer() {
+            clearInterval(resultTimer);
+            resultTimer = setInterval(() => {
+                resultTime--;
+                document.getElementById("resultTimer").innerText = resultTime;
+                
+                if (resultTime <= 0) {
+                    clearInterval(resultTimer);
+                    startGame(); // Start new round
+                }
+            }, 1000);
+        }
+
+        // Place a bet
+        function placeBet(choice) {
+            if (userBlocked) {
+                document.getElementById("result").innerText = "Your account is blocked!";
+                return;
+            }
+            
+            // Get bet amount
+            const betAmount = parseInt(document.getElementById("betAmount").value);
+            
+            // Validate bet amount
+            if (isNaN(betAmount) || betAmount < 1) {
+                document.getElementById("result").innerText = "Minimum bet is 1 point!";
+                document.getElementById("result").className = "lose";
+                return;
+            }
+            
+            if (betAmount > userPoints) {
+                document.getElementById("result").innerText = "Not enough points!";
+                document.getElementById("result").className = "lose";
+                return;
+            }
+            
+            // Set current bet
+            currentBet = {
+                choice: choice,
+                amount: betAmount,
+                timestamp: new Date()
+            };
+            
+            document.getElementById("result").innerText = `Bet placed: ${betAmount} on ${choice}`;
+            document.getElementById("result").className = "";
+        }
+
+        // Disable game when user is blocked
+        function disableGame() {
+            gameActive = false;
+            clearInterval(betTimer);
+            clearInterval(resultTimer);
+            document.getElementById("dragonBtn").disabled = true;
+            document.getElementById("tigerBtn").disabled = true;
+            document.getElementById("tieBtn").disabled = true;
+        }
+
+        // Save bet history
+        function saveBetHistory(win, pointsChange) {
+            if (!currentUser || !currentBet) return;
+            
+            db.collection("bets").add({
+                userId: currentUser.uid,
+                userEmail: currentUser.email,
+                choice: currentBet.choice,
+                amount: currentBet.amount,
+                win: win,
+                pointsChange: pointsChange,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            })
+            .then(() => {
+                loadUserBetHistory(); // Refresh history display
+            })
+            .catch(error => {
+                console.error("Error saving bet history:", error);
+            });
+        }
+
+        // Load user bet history
+        function loadUserBetHistory() {
+            if (!currentUser) return;
+            
+            const betHistoryEl = document.getElementById("betHistory");
+            betHistoryEl.innerHTML = "<div class='history-item'>Loading history...</div>";
+            
+            db.collection("bets")
+                .where("userId", "==", currentUser.uid)
+                .orderBy("timestamp", "desc")
+                .limit(10)
+                .get()
+                .then(querySnapshot => {
+                    betHistoryEl.innerHTML = "";
+                    
+                    if (querySnapshot.empty) {
+                        betHistoryEl.innerHTML = "<div class='history-item'>No bet history found</div>";
+                        return;
+                    }
+                    
+                    querySnapshot.forEach(doc => {
+                        const bet = doc.data();
+                        const time = bet.timestamp ? bet.timestamp.toDate().toLocaleTimeString() : "N/A";
+                        const resultClass = bet.win ? "history-win" : "history-loss";
+                        const resultText = bet.win ? "Won" : "Lost";
+                        const pointsChange = bet.win ? `+${bet.pointsChange}` : bet.pointsChange;
+                        
+                        betHistoryEl.innerHTML += `
+                            <div class="history-item ${resultClass}">
+                                [${time}] ${resultText} ${Math.abs(pointsChange)} points on ${bet.choice}
+                            </div>
+                        `;
+                    });
                 })
-                .finally(() => {
-                    // Re-enable buttons after 1.5 seconds
-                    setTimeout(() => {
-                        document.getElementById("dragonBtn").disabled = false;
-                        document.getElementById("tigerBtn").disabled = false;
-                        document.getElementById("tieBtn").disabled = false;
-                    }, 1500);
+                .catch(error => {
+                    console.error("Error loading bet history:", error);
+                    betHistoryEl.innerHTML = "<div class='history-item'>Error loading history</div>";
                 });
         }
     </script>

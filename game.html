@@ -625,6 +625,7 @@
             firebase.initializeApp(firebaseConfig);
         } catch (e) {
             console.error("Firebase init error:", e);
+            alert("Failed to initialize Firebase. Please try again later.");
         }
         
         const db = firebase.firestore();
@@ -634,7 +635,7 @@
         let timeLeft = 20;
         const timerEl = document.getElementById("timer");
         const betAmountInput = document.getElementById("betAmount");
-        let currentBet = null; // Store current bet details
+        let currentBet = null;
 
         function startTimer() {
             clearInterval(timerInterval);
@@ -652,7 +653,7 @@
             tieBtn.disabled = false;
             betInput.disabled = false;
             
-            currentBet = null; // Reset bet for new round
+            currentBet = null;
             document.getElementById("result").innerText = "Place your bet!";
             document.getElementById("result").className = "";
             
@@ -671,7 +672,6 @@
                     tieBtn.disabled = true;
                     betInput.disabled = true;
                     
-                    // Process bet result if a bet was placed
                     if (currentBet) {
                         processBetResult();
                     } else {
@@ -684,12 +684,14 @@
         }
 
         function placeBet(choice) {
-            if (!currentUser) return;
+            if (!currentUser) {
+                console.error("No user logged in");
+                return;
+            }
             
             const resultEl = document.getElementById("result");
             const betAmount = parseInt(betAmountInput.value);
             
-            // Validate bet amount
             if (isNaN(betAmount) || betAmount < 1) {
                 resultEl.innerText = "Please enter a valid bet amount (minimum 1 point)";
                 resultEl.className = "lose";
@@ -702,17 +704,14 @@
                 return;
             }
             
-            // Store bet details
             currentBet = {
                 choice: choice,
                 amount: betAmount
             };
             
-            // Update UI to show bet placed
             resultEl.innerText = `Bet placed: ${betAmount} points on ${choice.charAt(0).toUpperCase() + choice.slice(1)}! Waiting for timer...`;
             resultEl.className = "";
             
-            // Disable bet inputs to prevent changing bet
             document.getElementById("dragonBtn").disabled = true;
             document.getElementById("tigerBtn").disabled = true;
             document.getElementById("tieBtn").disabled = true;
@@ -725,11 +724,9 @@
             const dragonCardEl = document.getElementById("dragonCard");
             const tigerCardEl = document.getElementById("tigerCard");
             
-            // Generate random cards
             const dragonCard = Math.floor(Math.random() * 13) + 1;
             const tigerCard = Math.floor(Math.random() * 13) + 1;
             
-            // Flip cards with animation
             dragonCardEl.classList.add("flipped", "dealing");
             tigerCardEl.classList.add("flipped", "dealing");
             
@@ -737,7 +734,6 @@
                 document.getElementById("dragonValue").innerText = dragonCard;
                 document.getElementById("tigerValue").innerText = tigerCard;
                 
-                // Check win/loss
                 let win = false;
                 let winAmount = 0;
                 if (currentBet.choice === 'dragon' && dragonCard > tigerCard) {
@@ -751,7 +747,6 @@
                     winAmount = currentBet.amount * 8;
                 }
                 
-                // Update points
                 if (win) {
                     userPoints += winAmount;
                     resultEl.innerText = `You won! +${winAmount} points`;
@@ -765,15 +760,16 @@
                 pointsEl.innerText = userPoints;
                 betAmountInput.max = userPoints;
                 
-                // Save to Firestore
+                // Save points to Firestore
                 db.collection("users").doc(currentUser.uid).update({ 
                     points: userPoints 
+                }).then(() => {
+                    console.log("Points updated successfully:", userPoints);
                 }).catch(error => {
                     console.error("Error saving points:", error);
-                    resultEl.innerText += " (Save error)";
+                    resultEl.innerText += " (Failed to save points)";
                 });
                 
-                // Start new round
                 startNewRound();
             }, 1000);
         }
@@ -797,8 +793,10 @@
 
         firebase.auth().onAuthStateChanged(user => {
             if (user) {
-                db.collection("users").doc(user.uid).get()
-                .then(doc => {
+                currentUser = user;
+                const userDocRef = db.collection("users").doc(user.uid);
+                
+                userDocRef.get().then(doc => {
                     if (doc.exists) {
                         const userData = doc.data();
                         
@@ -809,31 +807,38 @@
                             return;
                         }
                         
-                        currentUser = user;
+                        userPoints = userData.points !== undefined ? userData.points : 1000;
+                        console.log("Loaded user points:", userPoints);
                         document.getElementById("userEmail").innerText = user.email;
-                        userPoints = userData.points || 1000;
                         document.getElementById("points").innerText = userPoints;
                         betAmountInput.max = userPoints;
                         startTimer();
                     } else {
-                        db.collection("users").doc(user.uid).set({
+                        // New user, create document
+                        userDocRef.set({
                             points: 1000,
                             email: user.email,
                             isBlocked: false
                         }).then(() => {
-                            currentUser = user;
-                            document.getElementById("userEmail").innerText = user.email;
+                            console.log("New user created with 1000 points");
                             userPoints = 1000;
+                            document.getElementById("userEmail").innerText = user.email;
                             document.getElementById("points").innerText = userPoints;
                             betAmountInput.max = userPoints;
                             startTimer();
+                        }).catch(error => {
+                            console.error("Error creating user document:", error);
+                            alert("Failed to create user profile. Please try again.");
+                            firebase.auth().signOut();
+                            window.location.href = "index.html";
                         });
                     }
-                })
-                .catch(error => {
-                    console.error("Error loading user data:", error);
+                }).catch(error => {
+                    console.error("Error fetching user data:", error);
                     document.getElementById("result").innerText = "Error loading user data";
                     document.getElementById("result").className = "lose";
+                    firebase.auth().signOut();
+                    window.location.href = "index.html";
                 });
             } else {
                 window.location.href = "index.html";
@@ -842,9 +847,27 @@
 
         function logout() {
             clearInterval(timerInterval);
-            firebase.auth().signOut().then(() => {
+            if (currentUser) {
+                // Ensure points are saved before logout
+                db.collection("users").doc(currentUser.uid).update({
+                    points: userPoints
+                }).then(() => {
+                    console.log("Points saved before logout:", userPoints);
+                    firebase.auth().signOut().then(() => {
+                        window.location.href = "index.html";
+                    }).catch(error => {
+                        console.error("Logout error:", error);
+                        alert("Failed to log out. Please try again.");
+                    });
+                }).catch(error => {
+                    console.error("Error saving points before logout:", error);
+                    firebase.auth().signOut();
+                    window.location.href = "index.html";
+                });
+            } else {
+                firebase.auth().signOut();
                 window.location.href = "index.html";
-            });
+            }
         }
     </script>
 </body>

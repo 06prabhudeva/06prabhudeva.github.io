@@ -384,6 +384,74 @@
             animation: deal 0.5s forwards;
         }
         
+        .timer-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.5rem;
+            margin: 20px 0;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        #timer {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            transition: color 0.3s;
+        }
+        
+        #timer.warning {
+            color: #ff416c;
+            animation: pulse 0.5s infinite;
+        }
+        
+        .bet-input-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin: 20px 0;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        .bet-input-container input {
+            width: 100px;
+            padding: 8px 12px;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            text-align: center;
+            outline: none;
+            transition: all 0.3s;
+        }
+        
+        .bet-input-container input:focus {
+            background: rgba(255, 255, 255, 0.25);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+        
+        .bet-input-container label {
+            font-size: 1.2rem;
+            color: #ffd700;
+            text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+        }
+        
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        
         @media (max-width: 900px) {
             .container {
                 flex-direction: column;
@@ -408,6 +476,23 @@
                 font-size: 1.1rem;
                 min-width: 180px;
             }
+            
+            .timer-container {
+                font-size: 1.2rem;
+            }
+            
+            .bet-input-container {
+                font-size: 1rem;
+            }
+            
+            .bet-input-container input {
+                width: 80px;
+                font-size: 1rem;
+            }
+            
+            #timer {
+                font-size: 1.5rem;
+            }
         }
     </style>
 </head>
@@ -422,6 +507,18 @@
                 </div>
                 <h1>The Ultimate Card Battle</h1>
                 <p>Place your bet and see who wins!</p>
+            </div>
+            
+            <div class="timer-container">
+                <i class="fas fa-clock"></i>
+                <span>Time to bet:</span>
+                <span id="timer">20</span>
+                <span>seconds</span>
+            </div>
+            
+            <div class="bet-input-container">
+                <label for="betAmount">Bet Amount:</label>
+                <input type="number" id="betAmount" min="1" placeholder="Enter points" value="1">
             </div>
             
             <div class="cards">
@@ -447,13 +544,13 @@
             <div id="result">Place your bet to start the game!</div>
             
             <div class="bet-options">
-                <button id="dragonBtn" class="bet-btn" onclick="bet('dragon')">
+                <button id="dragonBtn" class="bet-btn" onclick="placeBet('dragon')">
                     <i class="fas fa-dragon"></i> Bet on Dragon
                 </button>
-                <button id="tieBtn" class="bet-btn" onclick="bet('tie')">
+                <button id="tieBtn" class="bet-btn" onclick="placeBet('tie')">
                     <i class="fas fa-handshake"></i> Bet on Tie
                 </button>
-                <button id="tigerBtn" class="bet-btn" onclick="bet('tiger')">
+                <button id="tigerBtn" class="bet-btn" onclick="placeBet('tiger')">
                     <i class="fas fa-paw"></i> Bet on Tiger
                 </button>
             </div>
@@ -494,15 +591,19 @@
                 </li>
                 <li>
                     <span class="rule-icon"><i class="fas fa-coins"></i></span>
-                    <span>Each bet costs <span class="chip">50</span> points</span>
+                    <span>Minimum bet <span class="chip">1</span> point, maximum your total points</span>
                 </li>
                 <li>
                     <span class="rule-icon"><i class="fas fa-trophy"></i></span>
-                    <span>Win <span class="chip">100</span> points for correct bet</span>
+                    <span>Win <span class="chip">2x</span> your bet for Dragon/Tiger, <span class="chip">8x</span> for Tie</span>
                 </li>
                 <li>
                     <span class="rule-icon"><i class="fas fa-exclamation-triangle"></i></span>
                     <span>Blocked accounts cannot play</span>
+                </li>
+                <li>
+                    <span class="rule-icon"><i class="fas fa-clock"></i></span>
+                    <span>Place your bet within <strong>20 seconds</strong>, result after timer ends</span>
                 </li>
             </ul>
         </div>
@@ -529,110 +630,140 @@
         const db = firebase.firestore();
         let currentUser = null;
         let userPoints = 0;
+        let timerInterval = null;
+        let timeLeft = 20;
+        const timerEl = document.getElementById("timer");
+        const betAmountInput = document.getElementById("betAmount");
+        let currentBet = null; // Store current bet details
 
-        // Auth state handler with blocking check
-        firebase.auth().onAuthStateChanged(user => {
-            if (user) {
-                // Check if user is blocked
-                db.collection("users").doc(user.uid).get()
-                    .then(doc => {
-                        if (doc.exists) {
-                            const userData = doc.data();
-                            
-                            if (userData.isBlocked) {
-                                // Blocked user - sign out and redirect
-                                firebase.auth().signOut();
-                                alert("Your account is blocked! Please contact support.");
-                                window.location.href = "index.html";
-                                return;
-                            }
-                            
-                            // User is not blocked
-                            currentUser = user;
-                            document.getElementById("userEmail").innerText = user.email;
-                            userPoints = userData.points || 1000;
-                            document.getElementById("points").innerText = userPoints;
-                        } else {
-                            // Create new user document
-                            db.collection("users").doc(user.uid).set({
-                                points: 1000,
-                                email: user.email,
-                                isBlocked: false
-                            }).then(() => {
-                                currentUser = user;
-                                document.getElementById("userEmail").innerText = user.email;
-                                userPoints = 1000;
-                                document.getElementById("points").innerText = userPoints;
-                            });
-                        }
-                    })
-                    .catch(error => {
-                        console.error("Error loading user data:", error);
-                        document.getElementById("result").innerText = "Error loading user data";
+        function startTimer() {
+            clearInterval(timerInterval);
+            timeLeft = 20;
+            timerEl.innerText = timeLeft;
+            timerEl.classList.remove("warning");
+            
+            const dragonBtn = document.getElementById("dragonBtn");
+            const tigerBtn = document.getElementById("tigerBtn");
+            const tieBtn = document.getElementById("tieBtn");
+            const betInput = document.getElementById("betAmount");
+            
+            dragonBtn.disabled = false;
+            tigerBtn.disabled = false;
+            tieBtn.disabled = false;
+            betInput.disabled = false;
+            
+            currentBet = null; // Reset bet for new round
+            document.getElementById("result").innerText = "Place your bet!";
+            document.getElementById("result").className = "";
+            
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerEl.innerText = timeLeft;
+                
+                if (timeLeft <= 5) {
+                    timerEl.classList.add("warning");
+                }
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    dragonBtn.disabled = true;
+                    tigerBtn.disabled = true;
+                    tieBtn.disabled = true;
+                    betInput.disabled = true;
+                    
+                    // Process bet result if a bet was placed
+                    if (currentBet) {
+                        processBetResult();
+                    } else {
+                        document.getElementById("result").innerText = "No bet placed! Wait for the next round.";
                         document.getElementById("result").className = "lose";
-                    });
-            } else {
-                // User not logged in, redirect to login
-                window.location.href = "index.html";
-            }
-        });
+                        startNewRound();
+                    }
+                }
+            }, 1000);
+        }
 
-        // Betting function
-        function bet(choice) {
+        function placeBet(choice) {
             if (!currentUser) return;
             
-            const pointsEl = document.getElementById("points");
             const resultEl = document.getElementById("result");
+            const betAmount = parseInt(betAmountInput.value);
             
-            if (userPoints < 50) {
-                resultEl.innerText = "Not enough points to bet! Minimum 50 required.";
+            // Validate bet amount
+            if (isNaN(betAmount) || betAmount < 1) {
+                resultEl.innerText = "Please enter a valid bet amount (minimum 1 point)";
                 resultEl.className = "lose";
                 return;
             }
             
-            // Disable buttons during processing
-            const dragonBtn = document.getElementById("dragonBtn");
-            const tigerBtn = document.getElementById("tigerBtn");
-            const tieBtn = document.getElementById("tieBtn");
+            if (betAmount > userPoints) {
+                resultEl.innerText = `Not enough points! Maximum bet is ${userPoints} points`;
+                resultEl.className = "lose";
+                return;
+            }
             
-            dragonBtn.disabled = true;
-            tigerBtn.disabled = true;
-            tieBtn.disabled = true;
+            // Store bet details
+            currentBet = {
+                choice: choice,
+                amount: betAmount
+            };
             
-            // Flip cards animation
-            const dragonCard = document.getElementById("dragonCard");
-            const tigerCard = document.getElementById("tigerCard");
+            // Update UI to show bet placed
+            resultEl.innerText = `Bet placed: ${betAmount} points on ${choice.charAt(0).toUpperCase() + choice.slice(1)}! Waiting for timer...`;
+            resultEl.className = "";
             
-            dragonCard.classList.add("flipped");
-            tigerCard.classList.add("flipped");
+            // Disable bet inputs to prevent changing bet
+            document.getElementById("dragonBtn").disabled = true;
+            document.getElementById("tigerBtn").disabled = true;
+            document.getElementById("tieBtn").disabled = true;
+            betAmountInput.disabled = true;
+        }
+
+        function processBetResult() {
+            const pointsEl = document.getElementById("points");
+            const resultEl = document.getElementById("result");
+            const dragonCardEl = document.getElementById("dragonCard");
+            const tigerCardEl = document.getElementById("tigerCard");
             
-            // Generate random cards (1-13)
-            const dragon = Math.floor(Math.random() * 13) + 1;
-            const tiger = Math.floor(Math.random() * 13) + 1;
+            // Generate random cards
+            const dragonCard = Math.floor(Math.random() * 13) + 1;
+            const tigerCard = Math.floor(Math.random() * 13) + 1;
             
-            // Update card values
+            // Flip cards with animation
+            dragonCardEl.classList.add("flipped", "dealing");
+            tigerCardEl.classList.add("flipped", "dealing");
+            
             setTimeout(() => {
-                document.getElementById("dragonValue").innerText = dragon;
-                document.getElementById("tigerValue").innerText = tiger;
+                document.getElementById("dragonValue").innerText = dragonCard;
+                document.getElementById("tigerValue").innerText = tigerCard;
                 
                 // Check win/loss
                 let win = false;
-                if (choice === 'dragon' && dragon > tiger) win = true;
-                if (choice === 'tiger' && tiger > dragon) win = true;
-                if (choice === 'tie' && dragon === tiger) win = true;
+                let winAmount = 0;
+                if (currentBet.choice === 'dragon' && dragonCard > tigerCard) {
+                    win = true;
+                    winAmount = currentBet.amount * 2;
+                } else if (currentBet.choice === 'tiger' && tigerCard > dragonCard) {
+                    win = true;
+                    winAmount = currentBet.amount * 2;
+                } else if (currentBet.choice === 'tie' && dragonCard === tigerCard) {
+                    win = true;
+                    winAmount = currentBet.amount * 8;
+                }
                 
                 // Update points
                 if (win) {
-                    userPoints += 100;
-                    resultEl.innerText = `You won! +100 points`;
+                    userPoints += winAmount;
+                    resultEl.innerText = `You won! +${winAmount} points`;
                     resultEl.className = "win";
                 } else {
-                    userPoints -= 50;
-                    resultEl.innerText = `You lost! -50 points`;
+                    userPoints -= currentBet.amount;
+                    resultEl.innerText = `You lost! -${currentBet.amount} points`;
                     resultEl.className = "lose";
                 }
                 
                 pointsEl.innerText = userPoints;
+                betAmountInput.max = userPoints;
                 
                 // Save to Firestore
                 db.collection("users").doc(currentUser.uid).update({ 
@@ -642,29 +773,75 @@
                     resultEl.innerText += " (Save error)";
                 });
                 
-                // Re-enable buttons after delay
-                setTimeout(() => {
-                    dragonBtn.disabled = false;
-                    tigerBtn.disabled = false;
-                    tieBtn.disabled = false;
-                    
-                    // Reset card animation
-                    dragonCard.classList.remove("flipped");
-                    tigerCard.classList.remove("flipped");
-                    
-                    // Clear card values for next round
-                    setTimeout(() => {
-                        document.getElementById("dragonValue").innerText = "";
-                        document.getElementById("tigerValue").innerText = "";
-                        resultEl.innerText = "Place your next bet!";
-                        resultEl.className = "";
-                    }, 500);
-                }, 3000);
+                // Start new round
+                startNewRound();
             }, 1000);
         }
-        
-        // Logout function
+
+        function startNewRound() {
+            setTimeout(() => {
+                const dragonCardEl = document.getElementById("dragonCard");
+                const tigerCardEl = document.getElementById("tigerCard");
+                
+                dragonCardEl.classList.remove("flipped", "dealing");
+                tigerCardEl.classList.remove("flipped", "dealing");
+                
+                setTimeout(() => {
+                    document.getElementById("dragonValue").innerText = "";
+                    document.getElementById("tigerValue").innerText = "";
+                    betAmountInput.value = 1;
+                    startTimer();
+                }, 500);
+            }, 3000);
+        }
+
+        firebase.auth().onAuthStateChanged(user => {
+            if (user) {
+                db.collection("users").doc(user.uid).get()
+                .then(doc => {
+                    if (doc.exists) {
+                        const userData = doc.data();
+                        
+                        if (userData.isBlocked) {
+                            firebase.auth().signOut();
+                            alert("Your account is blocked! Please contact support.");
+                            window.location.href = "index.html";
+                            return;
+                        }
+                        
+                        currentUser = user;
+                        document.getElementById("userEmail").innerText = user.email;
+                        userPoints = userData.points || 1000;
+                        document.getElementById("points").innerText = userPoints;
+                        betAmountInput.max = userPoints;
+                        startTimer();
+                    } else {
+                        db.collection("users").doc(user.uid).set({
+                            points: 1000,
+                            email: user.email,
+                            isBlocked: false
+                        }).then(() => {
+                            currentUser = user;
+                            document.getElementById("userEmail").innerText = user.email;
+                            userPoints = 1000;
+                            document.getElementById("points").innerText = userPoints;
+                            betAmountInput.max = userPoints;
+                            startTimer();
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error("Error loading user data:", error);
+                    document.getElementById("result").innerText = "Error loading user data";
+                    document.getElementById("result").className = "lose";
+                });
+            } else {
+                window.location.href = "index.html";
+            }
+        });
+
         function logout() {
+            clearInterval(timerInterval);
             firebase.auth().signOut().then(() => {
                 window.location.href = "index.html";
             });

@@ -263,26 +263,26 @@
             font-weight: 600;
         }
         
-        .user-table {
+        .user-table, .statement-table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
         }
         
-        .user-table th {
+        .user-table th, .statement-table th {
             background: #2c3e50;
             color: white;
             padding: 15px;
             text-align: left;
         }
         
-        .user-table td {
+        .user-table td, .statement-table td {
             padding: 12px 15px;
             border-bottom: 1px solid #eee;
         }
         
-        .user-table tr:hover {
+        .user-table tr:hover, .statement-table tr:hover {
             background: #f1f2f6;
         }
         
@@ -345,6 +345,26 @@
             color: #c0392b;
         }
         
+        /* NEW: Statement Tab Styles */
+        .credit {
+            color: #27ae60;
+            font-weight: 600;
+        }
+        
+        .debit {
+            color: #e74c3c;
+            font-weight: 600;
+        }
+        
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        
+        .statement-table {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
         /* Messages */
         #dashboardMessage {
             margin: 15px 0;
@@ -367,7 +387,7 @@
                 gap: 15px;
             }
             
-            .user-table {
+            .user-table, .statement-table {
                 display: block;
                 overflow-x: auto;
             }
@@ -380,6 +400,15 @@
             
             .admin-info {
                 justify-content: center;
+            }
+            
+            .dashboard-tabs {
+                flex-wrap: wrap;
+            }
+            
+            .tab-btn {
+                flex: 1;
+                text-align: center;
             }
         }
     </style>
@@ -434,6 +463,9 @@
                 <button class="tab-btn" onclick="openTab('manageUsersTab')">
                     <i class="fas fa-users-cog"></i> Manage Users
                 </button>
+                <button class="tab-btn" onclick="openTab('userStatementsTab')">
+                    <i class="fas fa-file-alt"></i> User Statements
+                </button>
             </div>
             
             <!-- Create User Tab -->
@@ -486,7 +518,7 @@
                 <h2><i class="fas fa-users-cog"></i> Manage Users</h2>
                 
                 <div class="user-search">
-                    <input type="text" id="searchInput" class="search-input" placeholder="Search by email...">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Enter user email...">
                     <button class="search-btn" onclick="searchUsers()">
                         <i class="fas fa-search"></i> Search
                     </button>
@@ -500,44 +532,75 @@
                             <th>Email</th>
                             <th>Points</th>
                             <th>Status</th>
-                            <th>Created</th>
+                            <th>Created At</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="usersList">
-                        <!-- Users will be loaded here -->
-                    </tbody>
+                    <tbody id="usersList"></tbody>
+                </table>
+            </div>
+            
+            <!-- NEW: User Statements Tab -->
+            <div id="userStatementsTab" class="tab-content">
+                <h2><i class="fas fa-file-alt"></i> User Statements</h2>
+                
+                <div class="user-search">
+                    <input type="text" id="statementSearch" class="search-input" placeholder="Enter user email to filter...">
+                    <button class="search-btn" onclick="loadStatements()">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </div>
+                
+                <div id="statementMessage"></div>
+                
+                <table class="statement-table">
+                    <thead>
+                        <tr>
+                            <th>User Email</th>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="statementsList"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
     <script>
-        // Firebase Configuration
+        // Firebase Config
         const firebaseConfig = {
             apiKey: "AIzaSyBO7dxMxJwcSEceULVYH0K6n8d59wALw7U",
             authDomain: "dragon-tiger-game-8b5b0.firebaseapp.com",
             projectId: "dragon-tiger-game-8b5b0",
             storageBucket: "dragon-tiger-game-8b5b0.firebasestorage.app",
             messagingSenderId: "885603497015",
-            appId: "1:885603497015:web:afc57007437a3166ecfbb2"
+            appId: "1:885603497015:web:afc5701234567890"
         };
         
         // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
+        try {
+            firebase.initializeApp(firebaseConfig);
+        } catch (e) {
+            console.error("Firebase init error:", e);
+            showMessage(document.getElementById("loginMessage"), "Failed to initialize Firebase.", "error");
+        }
+        
         const db = firebase.firestore();
         let allUsers = [];
-        
+
         // Check admin authentication state
         firebase.auth().onAuthStateChanged(user => {
             if (user && user.email === "vishnukathat309@gmail.com") {
                 showAdminDashboard(user);
-                loadAllUsers();
+                loadUsers();
             } else {
                 showLoginSection();
             }
         });
-        
+
         // Admin Login Function
         function adminLogin() {
             const email = document.getElementById("adminEmail").value;
@@ -549,62 +612,52 @@
                 return;
             }
             
-            // Only allow specific admin email
             if (email !== "vishnukathat309@gmail.com") {
                 showMessage(messageEl, "Invalid admin credentials", "error");
                 return;
             }
             
             firebase.auth().signInWithEmailAndPassword(email, password)
-                .then((userCredential) => {
+                .then(userCredential => {
                     showAdminDashboard(userCredential.user);
-                    loadAllUsers();
+                    loadUsers();
                 })
                 .catch(error => {
                     console.error("Admin login error:", error);
                     showMessage(messageEl, "Login failed: " + error.message, "error");
                 });
         }
-        
+
         // Show Admin Dashboard
         function showAdminDashboard(user) {
             document.getElementById("loginSection").style.display = "none";
             document.getElementById("adminDashboard").style.display = "block";
             document.getElementById("adminEmailDisplay").textContent = user.email;
         }
-        
+
         // Show Login Section
         function showLoginSection() {
             document.getElementById("loginSection").style.display = "block";
             document.getElementById("adminDashboard").style.display = "none";
             document.getElementById("adminEmail").value = "";
             document.getElementById("adminPassword").value = "";
+            document.getElementById("loginMessage").textContent = "";
         }
-        
+
         // Open Tab
         function openTab(tabId) {
-            // Hide all tab contents
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            
-            // Deactivate all tab buttons
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            
-            // Show selected tab
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
-            
-            // Activate clicked button
             event.currentTarget.classList.add('active');
             
-            // Reload users when manage tab is opened
             if (tabId === 'manageUsersTab') {
-                loadAllUsers();
+                loadUsers();
+            } else if (tabId === 'userStatementsTab') {
+                loadStatements();
             }
         }
-        
+
         // Create New User
         function createUser() {
             const email = document.getElementById("newEmail").value;
@@ -626,24 +679,34 @@
                         points: points,
                         isBlocked: status === 'blocked',
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }).then(() => {
+                        // Log initial points as a transaction
+                        if (points > 0) {
+                            return db.collection("users").doc(user.uid).collection("transactions").add({
+                                type: "Admin Add",
+                                amount: points,
+                                description: "Initial points assigned by admin",
+                                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        }
                     });
                 })
                 .then(() => {
                     showMessage(messageEl, "User created successfully!", "success");
-                    // Clear form
                     document.getElementById("newEmail").value = "";
                     document.getElementById("newPassword").value = "";
-                    // Reload users list
-                    loadAllUsers();
+                    document.getElementById("points").value = "1000";
+                    document.getElementById("userStatus").value = "active";
+                    loadUsers();
                 })
                 .catch(error => {
                     console.error("User creation error:", error);
                     showMessage(messageEl, "Error: " + error.message, "error");
                 });
         }
-        
-        // Load All Users
-        function loadAllUsers() {
+
+        // Load Users
+        function loadUsers() {
             const usersList = document.getElementById("usersList");
             usersList.innerHTML = "<tr><td colspan='5' style='text-align:center;padding:30px;'>Loading users...</td></tr>";
             
@@ -695,16 +758,14 @@
                     showDashboardMessage("Error loading users: " + error.message, "error");
                 });
         }
-        
+
         // Search Users
         function searchUsers() {
             const searchTerm = document.getElementById("searchInput").value.toLowerCase();
-            const filteredUsers = allUsers.filter(user => 
-                user.email.toLowerCase().includes(searchTerm)
-            );
-            
             const usersList = document.getElementById("usersList");
             usersList.innerHTML = "";
+            
+            const filteredUsers = allUsers.filter(user => user.email.toLowerCase().includes(searchTerm));
             
             if (filteredUsers.length === 0) {
                 usersList.innerHTML = "<tr><td colspan='5' style='text-align:center;padding:30px;'>No matching users found</td></tr>";
@@ -740,131 +801,206 @@
                 `;
             });
         }
-        
-        // Toggle User Status (Block/Unblock)
-        function toggleUserStatus(userId, newStatus) {
-            if (!confirm(`Are you sure you want to ${newStatus ? 'block' : 'unblock'} this user?`)) return;
+
+        // NEW: Load Statements
+        function loadStatements() {
+            const searchTerm = document.getElementById("statementSearch").value.toLowerCase();
+            const statementsList = document.getElementById("statementsList");
+            const messageEl = document.getElementById("statementMessage");
+            
+            statementsList.innerHTML = "<tr><td colspan='5' style='text-align:center;padding:30px;'>Loading statements...</td></tr>";
+            
+            let userQuery = db.collection("users");
+            userQuery.get()
+                .then(querySnapshot => {
+                    statementsList.innerHTML = "";
+                    let hasStatements = false;
+                    
+                    const promises = [];
+                    querySnapshot.forEach(userDoc => {
+                        const user = userDoc.data();
+                        if (searchTerm && !user.email.toLowerCase().includes(searchTerm)) {
+                            return;
+                        }
+                        
+                        promises.push(
+                            db.collection("users").doc(userDoc.id).collection("transactions")
+                                .orderBy("timestamp", "desc")
+                                .limit(50)
+                                .get()
+                                .then(transactionSnapshot => {
+                                    transactionSnapshot.forEach(transDoc => {
+                                        const trans = transDoc.data();
+                                        const date = trans.timestamp ? trans.timestamp.toDate().toLocaleString() : "N/A";
+                                        const amountClass = trans.amount >= 0 ? "credit" : "debit";
+                                        const amountText = trans.amount >= 0 ? `+${trans.amount}` : `${trans.amount}`;
+                                        
+                                        statementsList.innerHTML += `
+                                            <tr>
+                                                <td>${user.email}</td>
+                                                <td>${date}</td>
+                                                <td>${trans.type}</td>
+                                                <td>${trans.description}</td>
+                                                <td class="${amountClass}">${amountText}</td>
+                                            </tr>
+                                        `;
+                                        hasStatements = true;
+                                    });
+                                })
+                        );
+                    });
+                    
+                    return Promise.all(promises).then(() => {
+                        if (!hasStatements) {
+                            statementsList.innerHTML = "<tr><td colspan='5' style='text-align:center;padding:30px;'>No statements found</td></tr>";
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error("Error loading statements:", error);
+                    showMessage(messageEl, "Error loading statements: " + error.message, "error");
+                });
+        }
+
+        // Toggle User Status
+        function toggleUserStatus(userId, block) {
+            if (!confirm(`Are you sure you want to ${block ? 'block' : 'unblock'} this user?`)) return;
             
             db.collection("users").doc(userId).update({
-                isBlocked: newStatus
-            })
-            .then(() => {
-                showDashboardMessage(`User has been ${newStatus ? 'blocked' : 'unblocked'} successfully!`, "success");
-                loadAllUsers();
-            })
-            .catch(error => {
-                console.error("Error updating user status:", error);
+                isBlocked: block
+            }).then(() => {
+                showDashboardMessage(`User ${block ? 'blocked' : 'unblocked'} successfully!`, "success");
+                loadUsers();
+            }).catch(error => {
+                console.error("Error toggling user status:", error);
                 showDashboardMessage("Error: " + error.message, "error");
             });
         }
-        
-        // Add Points to User
+
+        // Add Points
         function addPoints(userId) {
             const points = prompt("Enter points to add:", "100");
-            if (!points || isNaN(points)) return;
-            
-            const pointsNum = parseInt(points);
-            if (pointsNum <= 0) {
-                showDashboardMessage("Please enter a positive number", "error");
+            if (!points || isNaN(points) || parseInt(points) <= 0) {
+                showDashboardMessage("Please enter a valid positive number", "error");
                 return;
             }
             
+            const pointsNum = parseInt(points);
             db.collection("users").doc(userId).get()
                 .then(doc => {
                     if (doc.exists) {
                         const currentPoints = doc.data().points || 0;
                         return db.collection("users").doc(userId).update({
                             points: currentPoints + pointsNum
+                        }).then(() => {
+                            return db.collection("users").doc(userId).collection("transactions").add({
+                                type: "Admin Add",
+                                amount: pointsNum,
+                                description: "Points added by admin",
+                                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                            });
                         });
                     }
                 })
                 .then(() => {
                     showDashboardMessage(`${pointsNum} points added successfully!`, "success");
-                    loadAllUsers();
+                    loadUsers();
                 })
                 .catch(error => {
                     console.error("Error adding points:", error);
                     showDashboardMessage("Error: " + error.message, "error");
                 });
         }
-        
-        // Remove Points from User
+
+        // Remove Points
         function removePoints(userId) {
             const points = prompt("Enter points to remove:", "100");
-            if (!points || isNaN(points)) return;
-            
-            const pointsNum = parseInt(points);
-            if (pointsNum <= 0) {
-                showDashboardMessage("Please enter a positive number", "error");
+            if (!points || isNaN(points) || parseInt(points) <= 0) {
+                showDashboardMessage("Please enter a valid positive number", "error");
                 return;
             }
             
+            const pointsNum = parseInt(points);
             db.collection("users").doc(userId).get()
                 .then(doc => {
                     if (doc.exists) {
                         const currentPoints = doc.data().points || 0;
                         const newPoints = Math.max(0, currentPoints - pointsNum);
-                        
                         return db.collection("users").doc(userId).update({
                             points: newPoints
+                        }).then(() => {
+                            return db.collection("users").doc(userId).collection("transactions").add({
+                                type: "Admin Remove",
+                                amount: -pointsNum,
+                                description: "Points removed by admin",
+                                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                            });
                         });
                     }
                 })
                 .then(() => {
                     showDashboardMessage(`${pointsNum} points removed successfully!`, "success");
-                    loadAllUsers();
+                    loadUsers();
                 })
                 .catch(error => {
                     console.error("Error removing points:", error);
                     showDashboardMessage("Error: " + error.message, "error");
                 });
         }
-        
+
         // Delete User
         function deleteUser(userId, email) {
             if (!confirm(`Are you sure you want to delete user ${email}? This action cannot be undone!`)) return;
             
-            // Delete user from Authentication
-            firebase.auth().deleteUser(userId)
+            // Note: Admin cannot delete Firebase Auth user directly, so only delete Firestore data
+            db.collection("users").doc(userId).delete()
                 .then(() => {
-                    // Delete user from Firestore
-                    return db.collection("users").doc(userId).delete();
+                    // Optionally delete transactions subcollection
+                    db.collection("users").doc(userId).collection("transactions").get()
+                        .then(snapshot => {
+                            const batch = db.batch();
+                            snapshot.forEach(doc => batch.delete(doc.ref));
+                            return batch.commit();
+                        });
                 })
                 .then(() => {
                     showDashboardMessage("User deleted successfully!", "success");
-                    loadAllUsers();
+                    loadUsers();
                 })
                 .catch(error => {
                     console.error("Error deleting user:", error);
                     showDashboardMessage("Error: " + error.message, "error");
                 });
         }
-        
-        // Logout Function
+
+        // Logout
         function logout() {
             firebase.auth().signOut()
                 .then(() => {
                     showLoginSection();
-                    showDashboardMessage("You have been logged out", "success");
+                    showDashboardMessage("Logged out successfully", "success");
                 })
                 .catch(error => {
                     console.error("Logout error:", error);
+                    showDashboardMessage("Error: " + error.message, "error");
                 });
         }
-        
-        // Helper functions for messages
+
+        // Show Message
         function showMessage(element, text, type) {
             element.textContent = text;
             element.className = type;
+            element.style.display = "block";
             setTimeout(() => {
                 element.textContent = "";
                 element.className = "";
+                element.style.display = "none";
             }, 5000);
         }
-        
+
+        // Show Dashboard Message
         function showDashboardMessage(text, type) {
-            const messageEl = document.getElementById("dashboardMessage");
-            showMessage(messageEl, text, type);
+            showMessage(document.getElementById("dashboardMessage"), text, type);
         }
     </script>
 </body>

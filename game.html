@@ -17,13 +17,14 @@
         }
         
         body {
-            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            background: linear-gradient(135deg, #0a1929, #152642, #1d3557);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 20px;
             color: white;
+            overflow-x: hidden;
         }
         
         .container {
@@ -35,13 +36,13 @@
         
         .game-container {
             flex: 1;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(10, 25, 47, 0.85);
             border-radius: 20px;
             padding: 30px;
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
             position: relative;
             overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(64, 224, 208, 0.2);
         }
         
         .game-container::before {
@@ -51,7 +52,7 @@
             left: -50%;
             width: 200%;
             height: 200%;
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.05) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(64, 224, 208, 0.05) 0%, transparent 70%);
             z-index: -1;
         }
         
@@ -69,6 +70,7 @@
             font-size: 2.8rem;
             margin-bottom: 10px;
             color: #d4af37;
+            text-shadow: 0 0 15px rgba(212, 175, 55, 0.5);
         }
         
         .logo span {
@@ -83,6 +85,9 @@
             font-size: 2.5rem;
             margin-bottom: 10px;
             text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+            background: linear-gradient(45deg, #40e0d0, #ff8a00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
         
         .header p {
@@ -111,10 +116,12 @@
         
         .dragon-title {
             color: #ff416c;
+            text-shadow: 0 0 10px rgba(255, 65, 108, 0.5);
         }
         
         .tiger-title {
             color: #38ef7d;
+            text-shadow: 0 0 10px rgba(56, 239, 125, 0.5);
         }
         
         .card {
@@ -131,6 +138,7 @@
             overflow: hidden;
             transform-style: preserve-3d;
             transition: transform 0.5s;
+            cursor: pointer;
         }
         
         .card.flipped {
@@ -156,6 +164,8 @@
             background: linear-gradient(45deg, #1a2a6c, #b21f1f);
             transform: rotateY(180deg);
             color: white;
+            background: linear-gradient(135deg, #0a1929, #152642);
+            border: 3px solid #40e0d0;
         }
         
         .card-value {
@@ -184,15 +194,18 @@
             border-radius: 10px;
             background: rgba(255, 255, 255, 0.1);
             text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+            text-align: center;
         }
         
         .win {
             color: #4CAF50;
             animation: pulse 0.5s 3;
+            background: rgba(76, 175, 80, 0.2);
         }
         
         .lose {
             color: #f44336;
+            background: rgba(244, 67, 54, 0.2);
         }
         
         .bet-options {
@@ -217,6 +230,8 @@
             gap: 10px;
             min-width: 220px;
             justify-content: center;
+            position: relative;
+            overflow: hidden;
         }
         
         .bet-btn:hover {
@@ -292,7 +307,7 @@
             justify-content: center;
         }
         
-        .logout-btn {
+        .logout-btn, .statement-btn {
             padding: 10px 20px;
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
@@ -301,21 +316,24 @@
             cursor: pointer;
             transition: all 0.3s;
             font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         
-        .logout-btn:hover {
+        .logout-btn:hover, .statement-btn:hover {
             background: rgba(255, 65, 108, 0.3);
             transform: translateY(-2px);
         }
         
         .rules-panel {
             width: 300px;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(10, 25, 47, 0.85);
             border-radius: 20px;
             padding: 25px;
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
             align-self: flex-start;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(64, 224, 208, 0.2);
         }
         
         .rules-panel h2 {
@@ -323,6 +341,9 @@
             margin-bottom: 20px;
             color: #d4af37;
             text-align: center;
+            background: linear-gradient(45deg, #40e0d0, #ff8a00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
         
         .rules-list {
@@ -447,9 +468,77 @@
             text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
         }
         
+        .statement-container {
+            background: rgba(10, 25, 47, 0.95);
+            border-radius: 20px;
+            padding: 20px;
+            margin-top: 20px;
+            border: 1px solid rgba(64, 224, 208, 0.2);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+            display: none;
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        .statement-container.show {
+            display: block;
+        }
+        
+        .statement-container h2 {
+            font-size: 1.8rem;
+            color: #d4af37;
+            text-align: center;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #40e0d0, #ff8a00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .statement-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 1rem;
+            color: #fff;
+        }
+        
+        .statement-table th, .statement-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .statement-table th {
+            background: rgba(255, 255, 255, 0.1);
+            font-weight: bold;
+            color: #40e0d0;
+        }
+        
+        .statement-table td {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .credit {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        .debit {
+            color: #f44336;
+            font-weight: bold;
+        }
+        
         @keyframes fadeIn {
             0% { opacity: 0; transform: translateY(10px); }
             100% { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes glow {
+            0% { box-shadow: 0 0 5px #40e0d0; }
+            50% { box-shadow: 0 0 20px #40e0d0, 0 0 30px #ff8a00; }
+            100% { box-shadow: 0 0 5px #40e0d0; }
+        }
+        
+        .glowing-border {
+            animation: glow 2s infinite;
         }
         
         @media (max-width: 900px) {
@@ -493,10 +582,49 @@
             #timer {
                 font-size: 1.5rem;
             }
+            
+            .statement-table {
+                font-size: 0.9rem;
+            }
+            
+            .statement-table th, .statement-table td {
+                padding: 8px;
+            }
+        }
+        
+        /* Background animation */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            pointer-events: none;
+        }
+        
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(64, 224, 208, 0.3);
+            animation: float 15s infinite linear;
+        }
+        
+        @keyframes float {
+            0% {
+                transform: translateY(0) translateX(0) rotate(0);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100vh) translateX(100vw) rotate(360deg);
+                opacity: 0;
+            }
         }
     </style>
 </head>
 <body>
+    <div class="particles" id="particles"></div>
+    
     <div class="container">
         <div class="game-container">
             <div class="header">
@@ -558,7 +686,7 @@
             <div class="points-container">
                 <i class="fas fa-coins"></i>
                 <span>Your Points:</span>
-                <span id="points">0</span>
+                <span id="points">1000</span>
             </div>
             
             <div class="user-panel">
@@ -566,11 +694,50 @@
                     <div class="user-icon">
                         <i class="fas fa-user"></i>
                     </div>
-                    <div id="userEmail">user@example.com</div>
+                    <div id="userEmail">player@dragontiger.com</div>
                 </div>
-                <button class="logout-btn" onclick="logout()">
-                    <i class="fas fa-sign-out-alt"></i> Logout
-                </button>
+                <div>
+                    <button class="statement-btn" onclick="toggleStatement()">
+                        <i class="fas fa-file-alt"></i> View Statement
+                    </button>
+                    <button class="logout-btn" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </div>
+            </div>
+            
+            <div class="statement-container" id="statementContainer">
+                <h2><i class="fas fa-file-alt"></i> Account Statement</h2>
+                <table class="statement-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="statementBody">
+                        <tr>
+                            <td>2023-06-15 14:30</td>
+                            <td>Initial Deposit</td>
+                            <td>Welcome bonus</td>
+                            <td class="credit">+1000</td>
+                        </tr>
+                        <tr>
+                            <td>2023-06-15 15:45</td>
+                            <td>Bet Win</td>
+                            <td>Won bet on Dragon</td>
+                            <td class="credit">+200</td>
+                        </tr>
+                        <tr>
+                            <td>2023-06-15 16:20</td>
+                            <td>Bet Loss</td>
+                            <td>Lost bet on Tiger</td>
+                            <td class="debit">-100</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
         
@@ -610,33 +777,43 @@
     </div>
 
     <script>
-        // Firebase Config
-        const firebaseConfig = {
-            apiKey: "AIzaSyBO7dxMxJwcSEceULVYH0K6n8d59wALw7U",
-            authDomain: "dragon-tiger-game-8b5b0.firebaseapp.com",
-            projectId: "dragon-tiger-game-8b5b0",
-            storageBucket: "dragon-tiger-game-8b5b0.firebasestorage.app",
-            messagingSenderId: "885603497015",
-            appId: "1:885603497015:web:afc57007437a3166ecfbb2"
-        };
-        
-        // Initialize Firebase
-        try {
-            firebase.initializeApp(firebaseConfig);
-        } catch (e) {
-            console.error("Firebase init error:", e);
-            alert("Failed to initialize Firebase. Please try again later.");
+        // Create background particles
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            const particleCount = 30;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('particle');
+                
+                // Random size
+                const size = Math.random() * 20 + 5;
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                
+                // Random position
+                particle.style.left = `${Math.random() * 100}%`;
+                particle.style.top = `${Math.random() * 100}%`;
+                
+                // Random animation duration
+                particle.style.animationDuration = `${Math.random() * 20 + 10}s`;
+                
+                particlesContainer.appendChild(particle);
+            }
         }
         
-        const db = firebase.firestore();
-        let currentUser = null;
-        let userPoints = 0;
+        // Initialize particles
+        createParticles();
+        
+        // Game state
+        let userPoints = 1000;
         let timerInterval = null;
         let timeLeft = 20;
+        let currentBet = null;
         const timerEl = document.getElementById("timer");
         const betAmountInput = document.getElementById("betAmount");
-        let currentBet = null;
-
+        
+        // Start the game timer
         function startTimer() {
             clearInterval(timerInterval);
             timeLeft = 20;
@@ -683,12 +860,8 @@
             }, 1000);
         }
 
+        // Place a bet
         function placeBet(choice) {
-            if (!currentUser) {
-                console.error("No user logged in");
-                return;
-            }
-            
             const resultEl = document.getElementById("result");
             const betAmount = parseInt(betAmountInput.value);
             
@@ -718,6 +891,7 @@
             betAmountInput.disabled = true;
         }
 
+        // Process the bet result
         function processBetResult() {
             const pointsEl = document.getElementById("points");
             const resultEl = document.getElementById("result");
@@ -736,15 +910,24 @@
                 
                 let win = false;
                 let winAmount = 0;
+                let transactionType = "Bet Loss";
+                let transactionDescription = `Lost bet on ${currentBet.choice.charAt(0).toUpperCase() + currentBet.choice.slice(1)} (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;
+                
                 if (currentBet.choice === 'dragon' && dragonCard > tigerCard) {
                     win = true;
                     winAmount = currentBet.amount * 2;
+                    transactionType = "Bet Win";
+                    transactionDescription = `Won bet on Dragon (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;
                 } else if (currentBet.choice === 'tiger' && tigerCard > dragonCard) {
                     win = true;
                     winAmount = currentBet.amount * 2;
+                    transactionType = "Bet Win";
+                    transactionDescription = `Won bet on Tiger (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;
                 } else if (currentBet.choice === 'tie' && dragonCard === tigerCard) {
                     win = true;
                     winAmount = currentBet.amount * 8;
+                    transactionType = "Bet Win";
+                    transactionDescription = `Won bet on Tie (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;
                 }
                 
                 if (win) {
@@ -760,20 +943,14 @@
                 pointsEl.innerText = userPoints;
                 betAmountInput.max = userPoints;
                 
-                // Save points to Firestore
-                db.collection("users").doc(currentUser.uid).update({ 
-                    points: userPoints 
-                }).then(() => {
-                    console.log("Points updated successfully:", userPoints);
-                }).catch(error => {
-                    console.error("Error saving points:", error);
-                    resultEl.innerText += " (Failed to save points)";
-                });
+                // Add to statement
+                addToStatement(transactionType, transactionDescription, win ? winAmount : -currentBet.amount);
                 
                 startNewRound();
             }, 1000);
         }
 
+        // Start a new round
         function startNewRound() {
             setTimeout(() => {
                 const dragonCardEl = document.getElementById("dragonCard");
@@ -791,84 +968,47 @@
             }, 3000);
         }
 
-        firebase.auth().onAuthStateChanged(user => {
-            if (user) {
-                currentUser = user;
-                const userDocRef = db.collection("users").doc(user.uid);
-                
-                userDocRef.get().then(doc => {
-                    if (doc.exists) {
-                        const userData = doc.data();
-                        
-                        if (userData.isBlocked) {
-                            firebase.auth().signOut();
-                            alert("Your account is blocked! Please contact support.");
-                            window.location.href = "index.html";
-                            return;
-                        }
-                        
-                        userPoints = userData.points !== undefined ? userData.points : 1000;
-                        console.log("Loaded user points:", userPoints);
-                        document.getElementById("userEmail").innerText = user.email;
-                        document.getElementById("points").innerText = userPoints;
-                        betAmountInput.max = userPoints;
-                        startTimer();
-                    } else {
-                        // New user, create document
-                        userDocRef.set({
-                            points: 1000,
-                            email: user.email,
-                            isBlocked: false
-                        }).then(() => {
-                            console.log("New user created with 1000 points");
-                            userPoints = 1000;
-                            document.getElementById("userEmail").innerText = user.email;
-                            document.getElementById("points").innerText = userPoints;
-                            betAmountInput.max = userPoints;
-                            startTimer();
-                        }).catch(error => {
-                            console.error("Error creating user document:", error);
-                            alert("Failed to create user profile. Please try again.");
-                            firebase.auth().signOut();
-                            window.location.href = "index.html";
-                        });
-                    }
-                }).catch(error => {
-                    console.error("Error fetching user data:", error);
-                    document.getElementById("result").innerText = "Error loading user data";
-                    document.getElementById("result").className = "lose";
-                    firebase.auth().signOut();
-                    window.location.href = "index.html";
-                });
-            } else {
-                window.location.href = "index.html";
-            }
-        });
+        // Add to statement
+        function addToStatement(type, description, amount) {
+            const statementBody = document.getElementById("statementBody");
+            const now = new Date();
+            const dateStr = now.toLocaleString();
+            const amountClass = amount >= 0 ? "credit" : "debit";
+            const amountText = amount >= 0 ? `+${amount}` : `${amount}`;
+            
+            const newRow = document.createElement("tr");
+            newRow.innerHTML = `
+                <td>${dateStr}</td>
+                <td>${type}</td>
+                <td>${description}</td>
+                <td class="${amountClass}">${amountText}</td>
+            `;
+            
+            statementBody.insertBefore(newRow, statementBody.firstChild);
+        }
 
-        function logout() {
-            clearInterval(timerInterval);
-            if (currentUser) {
-                // Ensure points are saved before logout
-                db.collection("users").doc(currentUser.uid).update({
-                    points: userPoints
-                }).then(() => {
-                    console.log("Points saved before logout:", userPoints);
-                    firebase.auth().signOut().then(() => {
-                        window.location.href = "index.html";
-                    }).catch(error => {
-                        console.error("Logout error:", error);
-                        alert("Failed to log out. Please try again.");
-                    });
-                }).catch(error => {
-                    console.error("Error saving points before logout:", error);
-                    firebase.auth().signOut();
-                    window.location.href = "index.html";
-                });
+        // Toggle statement visibility
+        function toggleStatement() {
+            const statementContainer = document.getElementById("statementContainer");
+            const statementBtn = document.querySelector(".statement-btn");
+            
+            if (statementContainer.classList.contains("show")) {
+                statementContainer.classList.remove("show");
+                statementBtn.innerHTML = '<i class="fas fa-file-alt"></i> View Statement';
             } else {
-                firebase.auth().signOut();
-                window.location.href = "index.html";
+                statementContainer.classList.add("show");
+                statementBtn.innerHTML = '<i class="fas fa-file-alt"></i> Hide Statement';
             }
         }
+
+        // Logout function
+        function logout() {
+            alert("Logging out... Redirecting to login page");
+            // In a real app, this would redirect to the login page
+        }
+
+        // Start the game
+        startTimer();
     </script>
 </body>
 </html>

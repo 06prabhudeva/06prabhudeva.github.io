@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dragon Tiger Game</title>
+    <title>Dragon Tiger - Continuous Game</title>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
@@ -409,6 +409,7 @@
         .bet-input-container input:focus {
             background: rgba(255, 255, 255, 0.25);
             box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            outline: none;
         }
         .bet-input-container label {
             font-size: 1.2rem;
@@ -576,6 +577,11 @@
             text-align: center;
             border: 1px solid #ff6b6b;
         }
+        .round-id {
+            font-size: 0.8rem;
+            color: #aaa;
+            margin-top: 5px;
+        }
         @media (max-width: 900px) {
             .container {
                 flex-direction: column;
@@ -661,6 +667,7 @@
                 <span>Time to bet:</span>
                 <span id="timer">20</span>
                 <span>seconds</span>
+                <div class="round-id">Round ID: <span id="roundId">-</span></div>
             </div>
             <div class="bet-input-container">
                 <label for="betAmount">Bet Amount:</label>
@@ -782,6 +789,10 @@
                     <span class="rule-icon"><i class="fas fa-history"></i></span>
                     <span>View the last 50 rounds in the game history section</span>
                 </li>
+                <li>
+                    <span class="rule-icon"><i class="fas fa-sync"></i></span>
+                    <span>Games run continuously even with no players</span>
+                </li>
             </ul>
         </div>
     </div>
@@ -803,8 +814,10 @@
     // User data
     let userPoints = 1000;
     let currentUser = null;
-    let roundCounter = 1;
     let historyUnsubscribe = null;
+    let activeRoundUnsubscribe = null;
+    let currentRoundId = null;
+    let currentRoundData = null;
 
     // Game state
     let timerInterval = null;
@@ -821,10 +834,86 @@
             loadUserData(user.uid);
             // Load game history
             loadGameHistory();
+            // Subscribe to active round
+            subscribeToActiveRound();
         } else {
             window.location.href = "index.html";
         }
     });
+
+    // Subscribe to the active game round
+    function subscribeToActiveRound() {
+        if (activeRoundUnsubscribe) {
+            activeRoundUnsubscribe();
+        }
+        
+        activeRoundUnsubscribe = db.collection("activeRounds")
+            .doc("current")
+            .onSnapshot(doc => {
+                if (doc.exists) {
+                    const roundData = doc.data();
+                    currentRoundId = roundData.id;
+                    currentRoundData = roundData;
+                    
+                    document.getElementById("roundId").textContent = currentRoundId;
+                    
+                    // Update timer
+                    const now = Date.now();
+                    const roundEndTime = roundData.endTime.toDate().getTime();
+                    const remainingTime = Math.max(0, Math.floor((roundEndTime - now) / 1000));
+                    
+                    timeLeft = remainingTime;
+                    timerEl.innerText = timeLeft;
+                    
+                    if (timeLeft <= 5) {
+                        timerEl.classList.add("warning");
+                    } else {
+                        timerEl.classList.remove("warning");
+                    }
+                    
+                    // Clear any existing timer
+                    clearInterval(timerInterval);
+                    
+                    // Start updating timer
+                    timerInterval = setInterval(() => {
+                        timeLeft = Math.max(0, timeLeft - 1);
+                        timerEl.innerText = timeLeft;
+                        
+                        if (timeLeft <= 5) {
+                            timerEl.classList.add("warning");
+                        }
+                        
+                        if (timeLeft <= 0) {
+                            clearInterval(timerInterval);
+                            disableBetting();
+                            
+                            // If we have a bet, process it
+                            if (currentBet) {
+                                processBetResult();
+                            } else {
+                                document.getElementById("result").innerText = "Round ended. No bet placed!";
+                                document.getElementById("result").className = "lose";
+                            }
+                        }
+                    }, 1000);
+                    
+                    // If cards are revealed, show them
+                    if (roundData.status === 'completed') {
+                        document.getElementById("dragonValue").innerText = roundData.dragonCard;
+                        document.getElementById("tigerValue").innerText = roundData.tigerCard;
+                        
+                        // If we have a bet, show the result
+                        if (currentBet) {
+                            const result = determineResult(roundData.dragonCard, roundData.tigerCard);
+                            processBetResultForRound(result);
+                        }
+                    }
+                }
+            }, error => {
+                console.error("Error loading active round:", error);
+                showHistoryError("Error loading game data: " + error.message);
+            });
+    }
 
     function loadUserData(uid) {
         db.collection("users").doc(uid).get()
@@ -841,8 +930,6 @@
                         document.getElementById("dragonBtn").disabled = true;
                         document.getElementById("tigerBtn").disabled = true;
                         document.getElementById("tieBtn").disabled = true;
-                    } else {
-                        startTimer();
                     }
                 }
             })
@@ -865,8 +952,8 @@
         }
         
         // Subscribe to real-time updates
-        historyUnsubscribe = db.collection("gameHistory")
-            .orderBy("timestamp", "desc")
+        historyUnsubscribe = db.collection("gameRounds")
+            .orderBy("endTime", "desc")
             .limit(50)
             .onSnapshot(snapshot => {
                 historyContainer.innerHTML = "";
@@ -875,16 +962,6 @@
                     historyContainer.innerHTML = "<div style='padding: 20px; text-align: center; color: #aaa;'>No game history available</div>";
                     return;
                 }
-                
-                // Find the highest round number
-                let maxRound = 0;
-                snapshot.forEach(doc => {
-                    const round = doc.data().round;
-                    if (round > maxRound) maxRound = round;
-                });
-                
-                // Set round counter to the next available round
-                roundCounter = maxRound + 1;
                 
                 // Render all history items
                 snapshot.forEach(doc => {
@@ -903,8 +980,10 @@
         const historyItem = document.createElement("div");
         historyItem.className = "history-item";
         
+        const date = data.endTime.toDate().toLocaleTimeString();
+        
         historyItem.innerHTML = `
-            <div class="history-round">Round ${data.round}</div>
+            <div class="history-round">${date}</div>
             <div class="history-cards">
                 <div class="history-card dragon-history-card">${data.dragonCard}</div>
                 <div class="history-card tiger-history-card">${data.tigerCard}</div>
@@ -912,6 +991,7 @@
             <div class="history-result ${data.result === 'dragon' ? 'history-dragon-win' : data.result === 'tiger' ? 'history-tiger-win' : 'history-tie'}">
                 ${data.result === 'dragon' ? 'Dragon Wins' : data.result === 'tiger' ? 'Tiger Wins' : 'Tie'}
             </div>
+            <div class="round-id">Round ${data.id}</div>
         `;
         
         historyContainer.appendChild(historyItem);
@@ -925,51 +1005,12 @@
         errorElement.style.display = "block";
     }
 
-    // Start the game timer
-    function startTimer() {
-        clearInterval(timerInterval);
-        timeLeft = 20;
-        timerEl.innerText = timeLeft;
-        timerEl.classList.remove("warning");
-        
-        const dragonBtn = document.getElementById("dragonBtn");
-        const tigerBtn = document.getElementById("tigerBtn");
-        const tieBtn = document.getElementById("tieBtn");
-        const betInput = document.getElementById("betAmount");
-        
-        dragonBtn.disabled = false;
-        tigerBtn.disabled = false;
-        tieBtn.disabled = false;
-        betInput.disabled = false;
-        
-        currentBet = null;
-        document.getElementById("result").innerText = "Place your bet!";
-        document.getElementById("result").className = "";
-        
-        timerInterval = setInterval(() => {
-            timeLeft--;
-            timerEl.innerText = timeLeft;
-            
-            if (timeLeft <= 5) {
-                timerEl.classList.add("warning");
-            }
-            
-            if (timeLeft <= 0) {
-                clearInterval(timerInterval);
-                dragonBtn.disabled = true;
-                tigerBtn.disabled = true;
-                tieBtn.disabled = true;
-                betInput.disabled = true;
-                
-                if (currentBet) {
-                    processBetResult();
-                } else {
-                    document.getElementById("result").innerText = "No bet placed! Wait for the next round.";
-                    document.getElementById("result").className = "lose";
-                    setTimeout(startNewRound, 2000);
-                }
-            }
-        }, 1000);
+    // Disable betting buttons
+    function disableBetting() {
+        document.getElementById("dragonBtn").disabled = true;
+        document.getElementById("tigerBtn").disabled = true;
+        document.getElementById("tieBtn").disabled = true;
+        betAmountInput.disabled = true;
     }
 
     // Place a bet
@@ -991,7 +1032,8 @@
         
         currentBet = {
             choice: choice,
-            amount: betAmount
+            amount: betAmount,
+            roundId: currentRoundId
         };
         
         resultEl.innerText = `Bet placed: ${betAmount} points on ${choice.charAt(0).toUpperCase() + choice.slice(1)}! Waiting for timer...`;
@@ -1005,48 +1047,51 @@
 
     // Process bet result
     function processBetResult() {
+        if (!currentRoundData || currentRoundData.status !== 'completed') {
+            // Wait for round data to be available
+            setTimeout(processBetResult, 500);
+            return;
+        }
+        
+        const dragonCard = currentRoundData.dragonCard;
+        const tigerCard = currentRoundData.tigerCard;
+        const result = determineResult(dragonCard, tigerCard);
+        
+        processBetResultForRound(result);
+    }
+    
+    function processBetResultForRound(result) {
         const pointsEl = document.getElementById("points");
         const resultEl = document.getElementById("result");
-        const dragonCardEl = document.getElementById("dragonCard");
-        const tigerCardEl = document.getElementById("tigerCard");
-        
-        const dragonCard = Math.floor(Math.random() * 13) + 1;
-        const tigerCard = Math.floor(Math.random() * 13) + 1;
         
         // Add enhanced flip animation
-        dragonCardEl.classList.add("enhanced-flip");
-        tigerCardEl.classList.add("enhanced-flip");
+        document.getElementById("dragonCard").classList.add("enhanced-flip");
+        document.getElementById("tigerCard").classList.add("enhanced-flip");
         
         setTimeout(() => {
-            document.getElementById("dragonValue").innerText = dragonCard;
-            document.getElementById("tigerValue").innerText = tigerCard;
+            document.getElementById("dragonValue").innerText = currentRoundData.dragonCard;
+            document.getElementById("tigerValue").innerText = currentRoundData.tigerCard;
             
             let win = false;
             let winAmount = 0;
             let transactionType = "Bet Loss";
-            let transactionDescription = `Lost bet on ${currentBet.choice.charAt(0).toUpperCase() + currentBet.choice.slice(1)} (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;
-            let roundResult = "";
+            let transactionDescription = `Lost bet on ${currentBet.choice.charAt(0).toUpperCase() + currentBet.choice.slice(1)} (Dragon: ${currentRoundData.dragonCard}, Tiger: ${currentRoundData.tigerCard})`;
             
-            if (currentBet.choice === 'dragon' && dragonCard > tigerCard) {
+            if (currentBet.choice === 'dragon' && result === 'dragon') {
                 win = true;
                 winAmount = currentBet.amount * 2;
                 transactionType = "Bet Win";
-                transactionDescription = `Won bet on Dragon (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;
-                roundResult = "dragon";
-            } else if (currentBet.choice === 'tiger' && tigerCard > dragonCard) {
+                transactionDescription = `Won bet on Dragon (Dragon: ${currentRoundData.dragonCard}, Tiger: ${currentRoundData.tigerCard})`;
+            } else if (currentBet.choice === 'tiger' && result === 'tiger') {
                 win = true;
                 winAmount = currentBet.amount * 2;
                 transactionType = "Bet Win";
-                transactionDescription = `Won bet on Tiger (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;
-                roundResult = "tiger";
-            } else if (currentBet.choice === 'tie' && dragonCard === tigerCard) {
+                transactionDescription = `Won bet on Tiger (Dragon: ${currentRoundData.dragonCard}, Tiger: ${currentRoundData.tigerCard})`;
+            } else if (currentBet.choice === 'tie' && result === 'tie') {
                 win = true;
                 winAmount = currentBet.amount * 8;
                 transactionType = "Bet Win";
-                transactionDescription = `Won bet on Tie (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;
-                roundResult = "tie";
-            } else {
-                roundResult = dragonCard > tigerCard ? "dragon" : tigerCard > dragonCard ? "tiger" : "tie";
+                transactionDescription = `Won bet on Tie (Dragon: ${currentRoundData.dragonCard}, Tiger: ${currentRoundData.tigerCard})`;
             }
             
             if (win) {
@@ -1065,51 +1110,29 @@
             // Add to statement
             addToStatement(transactionType, transactionDescription, win ? winAmount : -currentBet.amount);
             
-            // Add to game history
-            saveGameHistory(dragonCard, tigerCard, roundResult);
-
             pointsEl.innerText = userPoints;
             betAmountInput.max = userPoints;
 
-            startNewRound();
+            // Reset for next round
+            setTimeout(() => {
+                currentBet = null;
+                document.getElementById("dragonCard").classList.remove("flipped", "enhanced-flip");
+                document.getElementById("tigerCard").classList.remove("flipped", "enhanced-flip");
+                setTimeout(() => {
+                    document.getElementById("dragonValue").innerText = "";
+                    document.getElementById("tigerValue").innerText = "";
+                    resultEl.innerText = "Place your bet for the next round!";
+                    resultEl.className = "";
+                }, 500);
+            }, 3000);
         }, 1000);
     }
 
-    // Save game history to Firestore
-    function saveGameHistory(dragonCard, tigerCard, result) {
-        if (!currentUser) return;
-        
-        // Save to Firebase
-        db.collection("gameHistory").add({
-            dragonCard: dragonCard,
-            tigerCard: tigerCard,
-            result: result,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            round: roundCounter
-        }).catch(error => {
-            console.error("Error saving game history:", error);
-            showHistoryError("Error saving game history: " + error.message);
-        });
-        
-        // Increment round counter for next game
-        roundCounter++;
-    }
-
-    // Start new round
-    function startNewRound() {
-        setTimeout(() => {
-            const dragonCardEl = document.getElementById("dragonCard");
-            const tigerCardEl = document.getElementById("tigerCard");
-            
-            dragonCardEl.classList.remove("flipped", "enhanced-flip");
-            tigerCardEl.classList.remove("flipped", "enhanced-flip");
-            
-            setTimeout(() => {
-                document.getElementById("dragonValue").innerText = "";
-                document.getElementById("tigerValue").innerText = "";
-                startTimer();
-            }, 500);
-        }, 3000);
+    // Determine result
+    function determineResult(dragonCard, tigerCard) {
+        if (dragonCard > tigerCard) return 'dragon';
+        if (tigerCard > dragonCard) return 'tiger';
+        return 'tie';
     }
 
     // Update user points in Firebase
@@ -1212,9 +1235,8 @@
 
     // Logout function
     function logout() {
-        if (historyUnsubscribe) {
-            historyUnsubscribe();
-        }
+        if (historyUnsubscribe) historyUnsubscribe();
+        if (activeRoundUnsubscribe) activeRoundUnsubscribe();
         firebase.auth().signOut().then(() => {
             window.location.href = "index.html";
         }).catch(error => {

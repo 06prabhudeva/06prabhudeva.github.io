@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dragon Tiger Game with History</title>
+    <title>Dragon Tiger Game</title>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
@@ -567,6 +567,15 @@
         .glowing-border {
             animation: glow 2s infinite;
         }
+        .error-message {
+            background: rgba(231, 76, 60, 0.3);
+            color: #ffdddd;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+            border: 1px solid #ff6b6b;
+        }
         @media (max-width: 900px) {
             .container {
                 flex-direction: column;
@@ -679,6 +688,10 @@
             <!-- Game History Section -->
             <div class="game-history">
                 <h3><i class="fas fa-history"></i> Recent Game History</h3>
+                <div class="error-message" id="historyError" style="display: none;">
+                    <i class="fas fa-exclamation-circle"></i> 
+                    <span id="errorText"></span>
+                </div>
                 <div class="history-container" id="historyContainer">
                     <!-- History items will be added here -->
                 </div>
@@ -773,30 +786,6 @@
         </div>
     </div>
 <script>
-    // Create background particles  
-    function createParticles() {  
-        const particlesContainer = document.getElementById('particles');  
-        const particleCount = 30;  
-          
-        for (let i = 0; i < particleCount; i++) {  
-            const particle = document.createElement('div');  
-            particle.classList.add('particle');  
-            // Random size  
-            const size = Math.random() * 20 + 5;  
-            particle.style.width = `${size}px`;  
-            particle.style.height = `${size}px`;  
-            // Random position  
-            particle.style.left = `${Math.random() * 100}%`;  
-            particle.style.top = `${Math.random() * 100}%`;  
-            // Random animation duration  
-            particle.style.animationDuration = `${Math.random() * 20 + 10}s`;  
-            particlesContainer.appendChild(particle);  
-        }  
-    }  
-      
-    // Initialize particles  
-    createParticles();  
-      
     // Firebase Config
     const firebaseConfig = {
         apiKey: "AIzaSyBO7dxMxJwcSEceULVYH0K6n8d59wALw7U",
@@ -837,9 +826,37 @@
         }
     });
 
-    // Load existing game history
+    function loadUserData(uid) {
+        db.collection("users").doc(uid).get()
+            .then(doc => {
+                if (doc.exists) {
+                    const userData = doc.data();
+                    userPoints = userData.points || 0;
+                    document.getElementById("points").innerText = userPoints;
+                    
+                    // Account block check
+                    if (userData.isBlocked) {
+                        document.getElementById("result").innerText = "Your account is blocked!";
+                        document.getElementById("result").className = "lose";
+                        document.getElementById("dragonBtn").disabled = true;
+                        document.getElementById("tigerBtn").disabled = true;
+                        document.getElementById("tieBtn").disabled = true;
+                    } else {
+                        startTimer();
+                    }
+                }
+            })
+            .catch(error => {
+                console.error("Error loading user data:", error);
+                showHistoryError("Failed to load user data");
+            });
+    }
+
+    // Load game history from Firebase
     function loadGameHistory() {
         const historyContainer = document.getElementById("historyContainer");
+        const errorElement = document.getElementById("historyError");
+        errorElement.style.display = "none";
         historyContainer.innerHTML = "<div style='padding: 20px; text-align: center;'>Loading history...</div>";
         
         // Unsubscribe any existing listener
@@ -876,7 +893,7 @@
                 });
             }, error => {
                 console.error("Error loading game history:", error);
-                historyContainer.innerHTML = `<div style='padding: 20px; text-align: center; color: #ff4444;'>Error loading history: ${error.message}</div>`;
+                showHistoryError("Error loading history: " + error.message);
             });
     }
 
@@ -900,29 +917,12 @@
         historyContainer.appendChild(historyItem);
     }
 
-    function loadUserData(uid) {
-        db.collection("users").doc(uid).get()
-            .then(doc => {
-                if (doc.exists) {
-                    const userData = doc.data();
-                    userPoints = userData.points || 0;
-                    document.getElementById("points").innerText = userPoints;
-                    
-                    // Account block check
-                    if (userData.isBlocked) {
-                        document.getElementById("result").innerText = "Your account is blocked!";
-                        document.getElementById("result").className = "lose";
-                        document.getElementById("dragonBtn").disabled = true;
-                        document.getElementById("tigerBtn").disabled = true;
-                        document.getElementById("tieBtn").disabled = true;
-                    } else {
-                        startTimer();
-                    }
-                }
-            })
-            .catch(error => {
-                console.error("Error loading user data:", error);
-            });
+    // Show history error
+    function showHistoryError(message) {
+        const errorElement = document.getElementById("historyError");
+        const errorText = document.getElementById("errorText");
+        errorText.innerText = message;
+        errorElement.style.display = "block";
     }
 
     // Start the game timer
@@ -1088,6 +1088,7 @@
             round: roundCounter
         }).catch(error => {
             console.error("Error saving game history:", error);
+            showHistoryError("Error saving game history: " + error.message);
         });
         
         // Increment round counter for next game
@@ -1220,6 +1221,30 @@
             console.error("Logout error:", error);
         });
     }
+    
+    // Initialize particles for background
+    function createParticles() {  
+        const particlesContainer = document.getElementById('particles');  
+        const particleCount = 30;  
+          
+        for (let i = 0; i < particleCount; i++) {  
+            const particle = document.createElement('div');  
+            particle.classList.add('particle');  
+            // Random size  
+            const size = Math.random() * 20 + 5;  
+            particle.style.width = `${size}px`;  
+            particle.style.height = `${size}px`;  
+            // Random position  
+            particle.style.left = `${Math.random() * 100}%`;  
+            particle.style.top = `${Math.random() * 100}%`;  
+            // Random animation duration  
+            particle.style.animationDuration = `${Math.random() * 20 + 10}s`;  
+            particlesContainer.appendChild(particle);  
+        }  
+    }  
+      
+    // Initialize particles  
+    createParticles();
 </script>
 </body>
 </html>

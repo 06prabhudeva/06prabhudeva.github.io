@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dragon Tiger Game</title>
+    <title>Fixed Dragon Tiger Game</title>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
@@ -621,24 +621,7 @@
                         </tr>
                     </thead>
                     <tbody id="statementBody">
-                        <tr>
-                            <td>2023-06-15 14:30</td>
-                            <td>Initial Deposit</td>
-                            <td>Welcome bonus</td>
-                            <td class="credit">+1000</td>
-                        </tr>
-                        <tr>
-                            <td>2023-06-15 15:45</td>
-                            <td>Bet Win</td>
-                            <td>Won bet on Dragon</td>
-                            <td class="credit">+200</td>
-                        </tr>
-                        <tr>
-                            <td>2023-06-15 16:20</td>
-                            <td>Bet Loss</td>
-                            <td>Lost bet on Tiger</td>
-                            <td class="debit">-100</td>
-                        </tr>
+                        <!-- Statement data will be loaded here -->
                     </tbody>
                 </table>
             </div>
@@ -702,7 +685,7 @@
     // Initialize particles  
     createParticles();  
       
-    // Firebase Config (Updated)
+    // Firebase Config
     const firebaseConfig = {
         apiKey: "AIzaSyBO7dxMxJwcSEceULVYH0K6n8d59wALw7U",
         authDomain: "dragon-tiger-game-8b5b0.firebaseapp.com",
@@ -719,6 +702,13 @@
     // User data
     let userPoints = 1000;
     let currentUser = null;
+
+    // Game state
+    let timerInterval = null;
+    let timeLeft = 20;
+    let currentBet = null;
+    const timerEl = document.getElementById("timer");
+    const betAmountInput = document.getElementById("betAmount");
 
     // Check auth state
     firebase.auth().onAuthStateChanged(user => {
@@ -746,6 +736,8 @@
                         document.getElementById("dragonBtn").disabled = true;
                         document.getElementById("tigerBtn").disabled = true;
                         document.getElementById("tieBtn").disabled = true;
+                    } else {
+                        startTimer();
                     }
                 }
             })
@@ -754,8 +746,167 @@
             });
     }
 
-    // Fixed function: Update points in Firebase
+    // Start the game timer
+    function startTimer() {
+        clearInterval(timerInterval);
+        timeLeft = 20;
+        timerEl.innerText = timeLeft;
+        timerEl.classList.remove("warning");
+        
+        const dragonBtn = document.getElementById("dragonBtn");
+        const tigerBtn = document.getElementById("tigerBtn");
+        const tieBtn = document.getElementById("tieBtn");
+        const betInput = document.getElementById("betAmount");
+        
+        dragonBtn.disabled = false;
+        tigerBtn.disabled = false;
+        tieBtn.disabled = false;
+        betInput.disabled = false;
+        
+        currentBet = null;
+        document.getElementById("result").innerText = "Place your bet!";
+        document.getElementById("result").className = "";
+        
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            timerEl.innerText = timeLeft;
+            
+            if (timeLeft <= 5) {
+                timerEl.classList.add("warning");
+            }
+            
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                dragonBtn.disabled = true;
+                tigerBtn.disabled = true;
+                tieBtn.disabled = true;
+                betInput.disabled = true;
+                
+                if (currentBet) {
+                    processBetResult();
+                } else {
+                    document.getElementById("result").innerText = "No bet placed! Wait for the next round.";
+                    document.getElementById("result").className = "lose";
+                    setTimeout(startNewRound, 2000);
+                }
+            }
+        }, 1000);
+    }
+
+    // Place a bet
+    function placeBet(choice) {
+        const resultEl = document.getElementById("result");
+        const betAmount = parseInt(betAmountInput.value);
+        
+        if (isNaN(betAmount) || betAmount < 1) {
+            resultEl.innerText = "Please enter a valid bet amount (minimum 1 point)";
+            resultEl.className = "lose";
+            return;
+        }
+        
+        if (betAmount > userPoints) {
+            resultEl.innerText = `Not enough points! Maximum bet is ${userPoints} points`;
+            resultEl.className = "lose";
+            return;
+        }
+        
+        currentBet = {
+            choice: choice,
+            amount: betAmount
+        };
+        
+        resultEl.innerText = `Bet placed: ${betAmount} points on ${choice.charAt(0).toUpperCase() + choice.slice(1)}! Waiting for timer...`;
+        resultEl.className = "";
+        
+        document.getElementById("dragonBtn").disabled = true;
+        document.getElementById("tigerBtn").disabled = true;
+        document.getElementById("tieBtn").disabled = true;
+        betAmountInput.disabled = true;
+    }
+
+    // Process bet result
+    function processBetResult() {
+        const pointsEl = document.getElementById("points");
+        const resultEl = document.getElementById("result");
+        const dragonCardEl = document.getElementById("dragonCard");
+        const tigerCardEl = document.getElementById("tigerCard");
+        
+        const dragonCard = Math.floor(Math.random() * 13) + 1;
+        const tigerCard = Math.floor(Math.random() * 13) + 1;
+        
+        dragonCardEl.classList.add("flipped", "dealing");
+        tigerCardEl.classList.add("flipped", "dealing");
+        
+        setTimeout(() => {
+            document.getElementById("dragonValue").innerText = dragonCard;
+            document.getElementById("tigerValue").innerText = tigerCard;
+            
+            let win = false;
+            let winAmount = 0;
+            let transactionType = "Bet Loss";
+            let transactionDescription = `Lost bet on ${currentBet.choice.charAt(0).toUpperCase() + currentBet.choice.slice(1)} (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;
+            
+            if (currentBet.choice === 'dragon' && dragonCard > tigerCard) {
+                win = true;
+                winAmount = currentBet.amount * 2;
+                transactionType = "Bet Win";
+                transactionDescription = `Won bet on Dragon (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;
+            } else if (currentBet.choice === 'tiger' && tigerCard > dragonCard) {
+                win = true;
+                winAmount = currentBet.amount * 2;
+                transactionType = "Bet Win";
+                transactionDescription = `Won bet on Tiger (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;
+            } else if (currentBet.choice === 'tie' && dragonCard === tigerCard) {
+                win = true;
+                winAmount = currentBet.amount * 8;
+                transactionType = "Bet Win";
+                transactionDescription = `Won bet on Tie (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;
+            }
+            
+            if (win) {
+                userPoints += winAmount;
+                resultEl.innerText = `You won! +${winAmount} points`;
+                resultEl.className = "win";
+            } else {
+                userPoints -= currentBet.amount;
+                resultEl.innerText = `You lost! -${currentBet.amount} points`;
+                resultEl.className = "lose";
+            }
+
+            // Update points in Firebase
+            updateUserPoints(userPoints);
+            
+            // Add to statement
+            addToStatement(transactionType, transactionDescription, win ? winAmount : -currentBet.amount);
+
+            pointsEl.innerText = userPoints;
+            betAmountInput.max = userPoints;
+
+            startNewRound();
+        }, 1000);
+    }
+
+    // Start new round
+    function startNewRound() {
+        setTimeout(() => {
+            const dragonCardEl = document.getElementById("dragonCard");
+            const tigerCardEl = document.getElementById("tigerCard");
+            
+            dragonCardEl.classList.remove("flipped", "dealing");
+            tigerCardEl.classList.remove("flipped", "dealing");
+            
+            setTimeout(() => {
+                document.getElementById("dragonValue").innerText = "";
+                document.getElementById("tigerValue").innerText = "";
+                startTimer();
+            }, 500);
+        }, 3000);
+    }
+
+    // Update user points in Firebase
     function updateUserPoints(points) {
+        if (!currentUser) return;
+        
         db.collection("users").doc(currentUser.uid).update({
             points: points
         }).catch(error => {
@@ -763,10 +914,58 @@
         });
     }
 
-    // New function: Load statement data
+    // Add to statement
+    function addToStatement(transactionType, transactionDescription, amount) {
+        const statementBody = document.getElementById("statementBody");
+        const now = new Date();
+        const dateStr = now.toLocaleString();
+        const amountClass = amount >= 0 ? "credit" : "debit";
+        const amountText = amount >= 0 ? `+${amount}` : `${amount}`;
+        
+        const newRow = document.createElement("tr");
+        newRow.innerHTML = `
+            <td>${dateStr}</td>
+            <td>${transactionType}</td>
+            <td>${transactionDescription}</td>
+            <td class="${amountClass}">${amountText}</td>
+        `;
+        
+        statementBody.insertBefore(newRow, statementBody.firstChild);
+        
+        // Also save to Firebase
+        if (currentUser) {
+            db.collection("users").doc(currentUser.uid).collection("transactions").add({
+                type: transactionType,
+                description: transactionDescription,
+                amount: amount,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(error => {
+                console.error("Error saving transaction:", error);
+            });
+        }
+    }
+
+    // Toggle statement visibility
+    function toggleStatement() {
+        const statementContainer = document.getElementById("statementContainer");
+        const statementBtn = document.querySelector(".statement-btn");
+        
+        if (statementContainer.classList.contains("show")) {
+            statementContainer.classList.remove("show");
+            statementBtn.innerHTML = '<i class="fas fa-file-alt"></i> View Statement';
+        } else {
+            loadStatementData();
+            statementContainer.classList.add("show");
+            statementBtn.innerHTML = '<i class="fas fa-file-alt"></i> Hide Statement';
+        }
+    }
+
+    // Load statement data
     function loadStatementData() {
         const statementBody = document.getElementById("statementBody");
         statementBody.innerHTML = "<tr><td colspan='4'>Loading statement...</td></tr>";
+
+        if (!currentUser) return;
 
         db.collection("users").doc(currentUser.uid).collection("transactions")
             .orderBy("timestamp", "desc")
@@ -802,218 +1001,14 @@
             });
     }
 
-    // Game state
-    let timerInterval = null;  
-    let timeLeft = 20;  
-    let currentBet = null;  
-    const timerEl = document.getElementById("timer");  
-    const betAmountInput = document.getElementById("betAmount");  
-      
-    // Start the game timer  
-    function startTimer() {  
-        // Check if user is authenticated
-        if (!currentUser) return;
-        
-        clearInterval(timerInterval);  
-        timeLeft = 20;  
-        timerEl.innerText = timeLeft;  
-        timerEl.classList.remove("warning");  
-          
-        const dragonBtn = document.getElementById("dragonBtn");  
-        const tigerBtn = document.getElementById("tigerBtn");  
-        const tieBtn = document.getElementById("tieBtn");  
-        const betInput = document.getElementById("betAmount");  
-          
-        dragonBtn.disabled = false;  
-        tigerBtn.disabled = false;  
-        tieBtn.disabled = false;  
-        betInput.disabled = false;  
-          
-        currentBet = null;  
-        document.getElementById("result").innerText = "Place your bet!";  
-        document.getElementById("result").className = "";  
-          
-        timerInterval = setInterval(() => {  
-            timeLeft--;  
-            timerEl.innerText = timeLeft;  
-              
-            if (timeLeft <= 5) {  
-                timerEl.classList.add("warning");  
-            }  
-              
-            if (timeLeft <= 0) {  
-                clearInterval(timerInterval);  
-                dragonBtn.disabled = true;  
-                tigerBtn.disabled = true;  
-                tieBtn.disabled = true;  
-                betInput.disabled = true;  
-                  
-                if (currentBet) {  
-                    processBetResult();  
-                } else {  
-                    document.getElementById("result").innerText = "No bet placed! Wait for the next round.";  
-                    document.getElementById("result").className = "lose";  
-                    startNewRound();  
-                }  
-            }  
-        }, 1000);  
-    }  
-
-    // Place a bet  
-    function placeBet(choice) {  
-        const resultEl = document.getElementById("result");  
-        const betAmount = parseInt(betAmountInput.value);  
-          
-        if (isNaN(betAmount) || betAmount < 1) {  
-            resultEl.innerText = "Please enter a valid bet amount (minimum 1 point)";  
-            resultEl.className = "lose";  
-            return;  
-        }  
-          
-        if (betAmount > userPoints) {  
-            resultEl.innerText = `Not enough points! Maximum bet is ${userPoints} points`;  
-            resultEl.className = "lose";  
-            return;  
-        }  
-          
-        currentBet = {  
-            choice: choice,  
-            amount: betAmount  
-        };  
-          
-        resultEl.innerText = `Bet placed: ${betAmount} points on ${choice.charAt(0).toUpperCase() + choice.slice(1)}! Waiting for timer...`;  
-        resultEl.className = "";  
-          
-        document.getElementById("dragonBtn").disabled = true;  
-        document.getElementById("tigerBtn").disabled = true;  
-        document.getElementById("tieBtn").disabled = true;  
-        betAmountInput.disabled = true;  
-    }  
-
-    // Process bet result  
-    function processBetResult() {  
-        const pointsEl = document.getElementById("points");  
-        const resultEl = document.getElementById("result");  
-        const dragonCardEl = document.getElementById("dragonCard");  
-        const tigerCardEl = document.getElementById("tigerCard");  
-          
-        const dragonCard = Math.floor(Math.random() * 13) + 1;  
-        const tigerCard = Math.floor(Math.random() * 13) + 1;  
-          
-        dragonCardEl.classList.add("flipped", "dealing");  
-        tigerCardEl.classList.add("flipped", "dealing");  
-        
-        setTimeout(() => {  
-            document.getElementById("dragonValue").innerText = dragonCard;  
-            document.getElementById("tigerValue").innerText = tigerCard;  
-            
-            let win = false;  
-            let winAmount = 0;  
-            let transactionType = "Bet Loss";  
-            let transactionDescription = `Lost bet on ${currentBet.choice.charAt(0).toUpperCase() + currentBet.choice.slice(1)} (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;  
-            
-            if (currentBet.choice === 'dragon' && dragonCard > tigerCard) {  
-                win = true;  
-                winAmount = currentBet.amount * 2;  
-                transactionType = "Bet Win";  
-                transactionDescription = `Won bet on Dragon (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;  
-            } else if (currentBet.choice === 'tiger' && tigerCard > dragonCard) {  
-                win = true;  
-                winAmount = currentBet.amount * 2;  
-                transactionType = "Bet Win";  
-                transactionDescription = `Won bet on Tiger (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;  
-            } else if (currentBet.choice === 'tie' && dragonCard === tigerCard) {  
-                win = true;  
-                winAmount = currentBet.amount * 8;  
-                transactionType = "Bet Win";  
-                transactionDescription = `Won bet on Tie (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;  
-            }  
-            
-            if (win) {
-                userPoints += winAmount;
-                resultEl.innerText = `You won! +${winAmount} points`;
-                resultEl.className = "win";
-            } else {
-                userPoints -= currentBet.amount;
-                resultEl.innerText = `You lost! -${currentBet.amount} points`;
-                resultEl.className = "lose";
-            }
-
-            // Update points in Firebase (using fixed function)
-            updateUserPoints(userPoints);
-            
-            // Add to statement
-            addToStatement(transactionType, transactionDescription, win ? winAmount : -currentBet.amount);
-
-            pointsEl.innerText = userPoints;
-            betAmountInput.max = userPoints;
-
-            startNewRound();
-        }, 1000);  
-    }  
-
-    // Start new round  
-    function startNewRound() {  
-        setTimeout(() => {  
-            const dragonCardEl = document.getElementById("dragonCard");  
-            const tigerCardEl = document.getElementById("tigerCard");  
-            
-            dragonCardEl.classList.remove("flipped", "dealing");  
-            tigerCardEl.classList.remove("flipped", "dealing");  
-            
-            setTimeout(() => {  
-                document.getElementById("dragonValue").innerText = "";  
-                document.getElementById("tigerValue").innerText = "";  
-                betAmountInput.value = 1;  
-                startTimer();  
-            }, 500);  
-        }, 3000);  
-    }  
-
-    // Add to statement  
-    function addToStatement(transactionType, transactionDescription, amount) {  
-        const statementBody = document.getElementById("statementBody");  
-        const now = new Date();  
-        const dateStr = now.toLocaleString();  
-        const amountClass = amount >= 0 ? "credit" : "debit";  
-        const amountText = amount >= 0 ? `+${amount}` : `${amount}`;  
-        
-        const newRow = document.createElement("tr");  
-        newRow.innerHTML = `  
-            <td>${dateStr}</td>  
-            <td>${transactionType}</td>  
-            <td>${transactionDescription}</td>  
-            <td class="${amountClass}">${amountText}</td>  
-        `;  
-        
-        statementBody.insertBefore(newRow, statementBody.firstChild);  
-    }  
-
-    // Toggle statement visibility
-    function toggleStatement() {
-        const statementContainer = document.getElementById("statementContainer");
-        
-        if (statementContainer.classList.contains("show")) {
-            statementContainer.classList.remove("show");
-            document.querySelector(".statement-btn").innerHTML = '<i class="fas fa-file-alt"></i> View Statement';
-        } else {
-            loadStatementData(); // Load statement data
-            statementContainer.classList.add("show");
-            document.querySelector(".statement-btn").innerHTML = '<i class="fas fa-file-alt"></i> Hide Statement';
-        }
-    }  
-
-    // Logout function  
+    // Logout function
     function logout() {
         firebase.auth().signOut().then(() => {
             window.location.href = "index.html";
         }).catch(error => {
             console.error("Logout error:", error);
         });
-    }  
-
-    // Start game  
-    startTimer();  
+    }
 </script>
 </body>
 </html>

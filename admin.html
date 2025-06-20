@@ -575,7 +575,7 @@
             apiKey: "AIzaSyBO7dxMxJwcSEceULVYH0K6n8d59wALw7U",
             authDomain: "dragon-tiger-game-8b5b0.firebaseapp.com",
             projectId: "dragon-tiger-game-8b5b0",
-            storageBucket: "dragon-tiger-game-8b5b0.firebasestorage.app",
+            storageBucket: "dragon-tiger-game-8b5b0.appspot.com",
             messagingSenderId: "885603497015",
             appId: "1:885603497015:web:afc5701234567890"
         };
@@ -583,6 +583,7 @@
         // Initialize Firebase
         try {
             firebase.initializeApp(firebaseConfig);
+            firebase.auth();
         } catch (e) {
             console.error("Firebase init error:", e);
             showMessage(document.getElementById("loginMessage"), "Failed to initialize Firebase.", "error");
@@ -658,7 +659,7 @@
             }
         }
 
-        // Create New User
+        // Create New User with enhanced error handling
         function createUser() {
             const email = document.getElementById("newEmail").value;
             const password = document.getElementById("newPassword").value;
@@ -701,7 +702,18 @@
                 })
                 .catch(error => {
                     console.error("User creation error:", error);
-                    showMessage(messageEl, "Error: " + error.message, "error");
+                    let message = "Error: " + error.message;
+                    
+                    // Handle specific errors
+                    if (error.code === "auth/email-already-in-use") {
+                        message = "Email already in use";
+                    } else if (error.code === "auth/invalid-email") {
+                        message = "Invalid email address";
+                    } else if (error.code === "auth/weak-password") {
+                        message = "Password should be at least 6 characters";
+                    }
+                    
+                    showMessage(messageEl, message, "error");
                 });
         }
 
@@ -802,7 +814,7 @@
             });
         }
 
-        // NEW: Load Statements
+        // Load Statements
         function loadStatements() {
             const searchTerm = document.getElementById("statementSearch").value.toLowerCase();
             const statementsList = document.getElementById("statementsList");

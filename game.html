@@ -815,6 +815,7 @@
     let userPoints = 1000;
     let currentUser = null;
     let roundCounter = 1;
+    let historyUnsubscribe = null;
 
     // Game state
     let timerInterval = null;
@@ -835,6 +836,69 @@
             window.location.href = "index.html";
         }
     });
+
+    // Load existing game history
+    function loadGameHistory() {
+        const historyContainer = document.getElementById("historyContainer");
+        historyContainer.innerHTML = "<div style='padding: 20px; text-align: center;'>Loading history...</div>";
+        
+        // Unsubscribe any existing listener
+        if (historyUnsubscribe) {
+            historyUnsubscribe();
+        }
+        
+        // Subscribe to real-time updates
+        historyUnsubscribe = db.collection("gameHistory")
+            .orderBy("timestamp", "desc")
+            .limit(50)
+            .onSnapshot(snapshot => {
+                historyContainer.innerHTML = "";
+                
+                if (snapshot.empty) {
+                    historyContainer.innerHTML = "<div style='padding: 20px; text-align: center; color: #aaa;'>No game history available</div>";
+                    return;
+                }
+                
+                // Find the highest round number
+                let maxRound = 0;
+                snapshot.forEach(doc => {
+                    const round = doc.data().round;
+                    if (round > maxRound) maxRound = round;
+                });
+                
+                // Set round counter to the next available round
+                roundCounter = maxRound + 1;
+                
+                // Render all history items
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    addHistoryItem(data);
+                });
+            }, error => {
+                console.error("Error loading game history:", error);
+                historyContainer.innerHTML = `<div style='padding: 20px; text-align: center; color: #ff4444;'>Error loading history: ${error.message}</div>`;
+            });
+    }
+
+    // Add a single history item to the container
+    function addHistoryItem(data) {
+        const historyContainer = document.getElementById("historyContainer");
+        const historyItem = document.createElement("div");
+        historyItem.className = "history-item";
+        
+        historyItem.innerHTML = `
+            <div class="history-round">Round ${data.round}</div>
+            <div class="history-cards">
+                <div class="history-card dragon-history-card">${data.dragonCard}</div>
+                <div class="history-card tiger-history-card">${data.tigerCard}</div>
+            </div>
+            <div class="history-result ${data.result === 'dragon' ? 'history-dragon-win' : data.result === 'tiger' ? 'history-tiger-win' : 'history-tie'}">
+                ${data.result === 'dragon' ? 'Dragon Wins' : data.result === 'tiger' ? 'Tiger Wins' : 'Tie'}
+            </div>
+        `;
+        
+        historyContainer.appendChild(historyItem);
+    }
 
     function loadUserData(uid) {
         db.collection("users").doc(uid).get()
@@ -1002,7 +1066,7 @@
             addToStatement(transactionType, transactionDescription, win ? winAmount : -currentBet.amount);
             
             // Add to game history
-            addToGameHistory(dragonCard, tigerCard, roundResult);
+            saveGameHistory(dragonCard, tigerCard, roundResult);
 
             pointsEl.innerText = userPoints;
             betAmountInput.max = userPoints;
@@ -1011,82 +1075,23 @@
         }, 1000);
     }
 
-    // Add round to game history
-    function addToGameHistory(dragonCard, tigerCard, result) {
-        const historyContainer = document.getElementById("historyContainer");
-        const historyItem = document.createElement("div");
-        historyItem.className = "history-item";
+    // Save game history to Firestore
+    function saveGameHistory(dragonCard, tigerCard, result) {
+        if (!currentUser) return;
         
-        // Create history content
-        historyItem.innerHTML = `
-            <div class="history-round">Round ${roundCounter++}</div>
-            <div class="history-cards">
-                <div class="history-card dragon-history-card">${dragonCard}</div>
-                <div class="history-card tiger-history-card">${tigerCard}</div>
-            </div>
-            <div class="history-result ${result === 'dragon' ? 'history-dragon-win' : result === 'tiger' ? 'history-tiger-win' : 'history-tie'}">
-                ${result === 'dragon' ? 'Dragon Wins' : result === 'tiger' ? 'Tiger Wins' : 'Tie'}
-            </div>
-        `;
+        // Save to Firebase
+        db.collection("gameHistory").add({
+            dragonCard: dragonCard,
+            tigerCard: tigerCard,
+            result: result,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            round: roundCounter
+        }).catch(error => {
+            console.error("Error saving game history:", error);
+        });
         
-        // Prepend to show newest first
-        historyContainer.insertBefore(historyItem, historyContainer.firstChild);
-        
-        // Limit to 50 items
-        if (historyContainer.children.length > 50) {
-            historyContainer.removeChild(historyContainer.lastChild);
-        }
-        
-        // Also save to Firebase (for persistence across sessions)
-        if (currentUser) {
-            db.collection("gameHistory").add({
-                dragonCard: dragonCard,
-                tigerCard: tigerCard,
-                result: result,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                round: roundCounter - 1
-            }).catch(error => {
-                console.error("Error saving game history:", error);
-            });
-        }
-    }
-    
-    // Load game history from Firebase
-    function loadGameHistory() {
-        const historyContainer = document.getElementById("historyContainer");
-        historyContainer.innerHTML = "";
-        
-        db.collection("gameHistory")
-            .orderBy("timestamp", "desc")
-            .limit(50)
-            .get()
-            .then(snapshot => {
-                if (!snapshot.empty) {
-                    roundCounter = snapshot.docs[0].data().round + 1;
-                    
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        const historyItem = document.createElement("div");
-                        historyItem.className = "history-item";
-                        
-                        historyItem.innerHTML = `
-                            <div class="history-round">Round ${data.round}</div>
-                            <div class="history-cards">
-                                <div class="history-card dragon-history-card">${data.dragonCard}</div>
-                                <div class="history-card tiger-history-card">${data.tigerCard}</div>
-                            </div>
-                            <div class="history-result ${data.result === 'dragon' ? 'history-dragon-win' : data.result === 'tiger' ? 'history-tiger-win' : 'history-tie'}">
-                                ${data.result === 'dragon' ? 'Dragon Wins' : data.result === 'tiger' ? 'Tiger Wins' : 'Tie'}
-                            </div>
-                        `;
-                        
-                        historyContainer.appendChild(historyItem);
-                    });
-                }
-            })
-            .catch(error => {
-                console.error("Error loading game history:", error);
-            });
+        // Increment round counter for next game
+        roundCounter++;
     }
 
     // Start new round
@@ -1206,6 +1211,9 @@
 
     // Logout function
     function logout() {
+        if (historyUnsubscribe) {
+            historyUnsubscribe();
+        }
         firebase.auth().signOut().then(() => {
             window.location.href = "index.html";
         }).catch(error => {

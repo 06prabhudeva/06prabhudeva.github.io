@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fixed Dragon Tiger Game</title>
+    <title>Dragon Tiger Game with History</title>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
@@ -122,7 +122,7 @@
             position: relative;
             overflow: hidden;
             transform-style: preserve-3d;
-            transition: transform 0.5s;
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             cursor: pointer;
         }
         .card.flipped {
@@ -348,8 +348,16 @@
             0% { transform: translateY(-100px) rotate(-10deg); opacity: 0; }
             100% { transform: translateY(0) rotate(0); opacity: 1; }
         }
+        @keyframes flip {
+            0% { transform: rotateY(0); }
+            50% { transform: rotateY(90deg); }
+            100% { transform: rotateY(180deg); }
+        }
         .dealing {
             animation: deal 0.5s forwards;
+        }
+        .enhanced-flip {
+            animation: flip 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
         .timer-container {
             display: flex;
@@ -456,6 +464,97 @@
             color: #f44336;
             font-weight: bold;
         }
+        
+        /* Game History Section */
+        .game-history {
+            margin: 20px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 15px;
+            border: 1px solid rgba(64, 224, 208, 0.2);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        .game-history h3 {
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+            color: #40e0d0;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .history-container {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding: 10px 5px;
+            max-width: 100%;
+        }
+        .history-item {
+            min-width: 80px;
+            padding: 10px;
+            background: rgba(10, 25, 47, 0.7);
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s;
+        }
+        .history-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 12px rgba(0, 0, 0, 0.3);
+            background: rgba(20, 40, 70, 0.8);
+        }
+        .history-round {
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-bottom: 5px;
+        }
+        .history-cards {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            margin-bottom: 5px;
+        }
+        .history-card {
+            width: 25px;
+            height: 35px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        .dragon-history-card {
+            background: linear-gradient(135deg, #ff416c, #ff4b2b);
+            box-shadow: 0 2px 5px rgba(255, 65, 108, 0.3);
+        }
+        .tiger-history-card {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            box-shadow: 0 2px 5px rgba(56, 239, 125, 0.3);
+        }
+        .history-result {
+            font-size: 0.9rem;
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+        .history-dragon-win {
+            background: rgba(255, 65, 108, 0.2);
+            color: #ff416c;
+        }
+        .history-tiger-win {
+            background: rgba(56, 239, 125, 0.2);
+            color: #38ef7d;
+        }
+        .history-tie {
+            background: rgba(218, 152, 180, 0.2);
+            color: #da98b4;
+        }
+        
         @keyframes fadeIn {
             0% { opacity: 0; transform: translateY(10px); }
             100% { opacity: 1; transform: translateY(0); }
@@ -576,6 +675,15 @@
                     <div id="tigerValue" class="card-value tiger-value"></div>
                 </div>
             </div>
+            
+            <!-- Game History Section -->
+            <div class="game-history">
+                <h3><i class="fas fa-history"></i> Recent Game History</h3>
+                <div class="history-container" id="historyContainer">
+                    <!-- History items will be added here -->
+                </div>
+            </div>
+            
             <div id="result">Place your bet to start the game!</div>
             <div class="bet-options">
                 <button id="dragonBtn" class="bet-btn" onclick="placeBet('dragon')">
@@ -657,6 +765,10 @@
                     <span class="rule-icon"><i class="fas fa-clock"></i></span>
                     <span>Place your bet within <strong>20 seconds</strong>, result after timer ends</span>
                 </li>
+                <li>
+                    <span class="rule-icon"><i class="fas fa-history"></i></span>
+                    <span>View the last 50 rounds in the game history section</span>
+                </li>
             </ul>
         </div>
     </div>
@@ -702,6 +814,7 @@
     // User data
     let userPoints = 1000;
     let currentUser = null;
+    let roundCounter = 1;
 
     // Game state
     let timerInterval = null;
@@ -716,6 +829,8 @@
             currentUser = user;
             document.getElementById("userEmail").innerText = user.email;
             loadUserData(user.uid);
+            // Load game history
+            loadGameHistory();
         } else {
             window.location.href = "index.html";
         }
@@ -834,8 +949,9 @@
         const dragonCard = Math.floor(Math.random() * 13) + 1;
         const tigerCard = Math.floor(Math.random() * 13) + 1;
         
-        dragonCardEl.classList.add("flipped", "dealing");
-        tigerCardEl.classList.add("flipped", "dealing");
+        // Add enhanced flip animation
+        dragonCardEl.classList.add("enhanced-flip");
+        tigerCardEl.classList.add("enhanced-flip");
         
         setTimeout(() => {
             document.getElementById("dragonValue").innerText = dragonCard;
@@ -845,22 +961,28 @@
             let winAmount = 0;
             let transactionType = "Bet Loss";
             let transactionDescription = `Lost bet on ${currentBet.choice.charAt(0).toUpperCase() + currentBet.choice.slice(1)} (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;
+            let roundResult = "";
             
             if (currentBet.choice === 'dragon' && dragonCard > tigerCard) {
                 win = true;
                 winAmount = currentBet.amount * 2;
                 transactionType = "Bet Win";
                 transactionDescription = `Won bet on Dragon (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;
+                roundResult = "dragon";
             } else if (currentBet.choice === 'tiger' && tigerCard > dragonCard) {
                 win = true;
                 winAmount = currentBet.amount * 2;
                 transactionType = "Bet Win";
                 transactionDescription = `Won bet on Tiger (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;
+                roundResult = "tiger";
             } else if (currentBet.choice === 'tie' && dragonCard === tigerCard) {
                 win = true;
                 winAmount = currentBet.amount * 8;
                 transactionType = "Bet Win";
                 transactionDescription = `Won bet on Tie (Dragon: ${dragonCard}, Tiger: ${tigerCard})`;
+                roundResult = "tie";
+            } else {
+                roundResult = dragonCard > tigerCard ? "dragon" : tigerCard > dragonCard ? "tiger" : "tie";
             }
             
             if (win) {
@@ -878,6 +1000,9 @@
             
             // Add to statement
             addToStatement(transactionType, transactionDescription, win ? winAmount : -currentBet.amount);
+            
+            // Add to game history
+            addToGameHistory(dragonCard, tigerCard, roundResult);
 
             pointsEl.innerText = userPoints;
             betAmountInput.max = userPoints;
@@ -886,14 +1011,92 @@
         }, 1000);
     }
 
+    // Add round to game history
+    function addToGameHistory(dragonCard, tigerCard, result) {
+        const historyContainer = document.getElementById("historyContainer");
+        const historyItem = document.createElement("div");
+        historyItem.className = "history-item";
+        
+        // Create history content
+        historyItem.innerHTML = `
+            <div class="history-round">Round ${roundCounter++}</div>
+            <div class="history-cards">
+                <div class="history-card dragon-history-card">${dragonCard}</div>
+                <div class="history-card tiger-history-card">${tigerCard}</div>
+            </div>
+            <div class="history-result ${result === 'dragon' ? 'history-dragon-win' : result === 'tiger' ? 'history-tiger-win' : 'history-tie'}">
+                ${result === 'dragon' ? 'Dragon Wins' : result === 'tiger' ? 'Tiger Wins' : 'Tie'}
+            </div>
+        `;
+        
+        // Prepend to show newest first
+        historyContainer.insertBefore(historyItem, historyContainer.firstChild);
+        
+        // Limit to 50 items
+        if (historyContainer.children.length > 50) {
+            historyContainer.removeChild(historyContainer.lastChild);
+        }
+        
+        // Also save to Firebase (for persistence across sessions)
+        if (currentUser) {
+            db.collection("gameHistory").add({
+                dragonCard: dragonCard,
+                tigerCard: tigerCard,
+                result: result,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                round: roundCounter - 1
+            }).catch(error => {
+                console.error("Error saving game history:", error);
+            });
+        }
+    }
+    
+    // Load game history from Firebase
+    function loadGameHistory() {
+        const historyContainer = document.getElementById("historyContainer");
+        historyContainer.innerHTML = "";
+        
+        db.collection("gameHistory")
+            .orderBy("timestamp", "desc")
+            .limit(50)
+            .get()
+            .then(snapshot => {
+                if (!snapshot.empty) {
+                    roundCounter = snapshot.docs[0].data().round + 1;
+                    
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        const historyItem = document.createElement("div");
+                        historyItem.className = "history-item";
+                        
+                        historyItem.innerHTML = `
+                            <div class="history-round">Round ${data.round}</div>
+                            <div class="history-cards">
+                                <div class="history-card dragon-history-card">${data.dragonCard}</div>
+                                <div class="history-card tiger-history-card">${data.tigerCard}</div>
+                            </div>
+                            <div class="history-result ${data.result === 'dragon' ? 'history-dragon-win' : data.result === 'tiger' ? 'history-tiger-win' : 'history-tie'}">
+                                ${data.result === 'dragon' ? 'Dragon Wins' : data.result === 'tiger' ? 'Tiger Wins' : 'Tie'}
+                            </div>
+                        `;
+                        
+                        historyContainer.appendChild(historyItem);
+                    });
+                }
+            })
+            .catch(error => {
+                console.error("Error loading game history:", error);
+            });
+    }
+
     // Start new round
     function startNewRound() {
         setTimeout(() => {
             const dragonCardEl = document.getElementById("dragonCard");
             const tigerCardEl = document.getElementById("tigerCard");
             
-            dragonCardEl.classList.remove("flipped", "dealing");
-            tigerCardEl.classList.remove("flipped", "dealing");
+            dragonCardEl.classList.remove("flipped", "enhanced-flip");
+            tigerCardEl.classList.remove("flipped", "enhanced-flip");
             
             setTimeout(() => {
                 document.getElementById("dragonValue").innerText = "";

@@ -226,13 +226,15 @@
         };
         
         // Initialize Firebase
+        let db;
         try {
             firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
         } catch (e) {
             console.error("Firebase init error:", e);
         }
 
-        // Login function with account blocking check
+        // Login function with account blocking and balance check
         function login() {
             const email = document.getElementById("email").value;
             const password = document.getElementById("password").value;
@@ -258,7 +260,7 @@
                 .then((userCredential) => {
                     // Check if user is blocked
                     const userId = userCredential.user.uid;
-                    return firebase.firestore().collection("users").doc(userId).get();
+                    return db.collection("users").doc(userId).get();
                 })
                 .then(doc => {
                     if (doc.exists) {
@@ -268,8 +270,16 @@
                             firebase.auth().signOut();
                             throw new Error("Your account is blocked!");
                         }
-                        // Not blocked - redirect to game page
-                        window.location.href = "game.html";
+                        
+                        // Check balance (default to 0 if not set)
+                        const userBalance = userData.balance || 0;
+                        if (userBalance < 10) {
+                            // Insufficient balance - redirect to payment
+                            window.location.href = "payment.html";
+                        } else {
+                            // Sufficient balance - redirect to game
+                            window.location.href = "game.html";
+                        }
                     } else {
                         throw new Error("User data not found");
                     }

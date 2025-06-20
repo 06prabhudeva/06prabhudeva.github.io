@@ -738,19 +738,19 @@
                     const userData = doc.data();
                     userPoints = userData.points || 0;
                     document.getElementById("points").innerText = userPoints;
-
-                    // Check if user is blocked  
-                    if (userData.isBlocked) {  
-                        document.getElementById("result").innerText = "Your account is blocked!";  
-                        document.getElementById("result").className = "lose";  
-                        document.getElementById("dragonBtn").disabled = true;  
-                        document.getElementById("tigerBtn").disabled = true;  
-                        document.getElementById("tieBtn").disabled = true;  
-                    }  
-                }  
-            })  
-            .catch(error => {  
-                console.error("Error loading user data:", error);  
+                    
+                    // Account block check
+                    if (userData.isBlocked) {
+                        document.getElementById("result").innerText = "Your account is blocked!";
+                        document.getElementById("result").className = "lose";
+                        document.getElementById("dragonBtn").disabled = true;
+                        document.getElementById("tigerBtn").disabled = true;
+                        document.getElementById("tieBtn").disabled = true;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error("Error loading user data:", error);
             });
     }
 

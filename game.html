@@ -702,14 +702,14 @@
     // Initialize particles  
     createParticles();  
       
-    // Firebase Config
+    // Firebase Config (Updated)
     const firebaseConfig = {
         apiKey: "AIzaSyBO7dxMxJwcSEceULVYH0K6n8d59wALw7U",
         authDomain: "dragon-tiger-game-8b5b0.firebaseapp.com",
         projectId: "dragon-tiger-game-8b5b0",
-        storageBucket: "dragon-tiger-game-8b5b0.firebasestorage.app",
+        storageBucket: "dragon-tiger-game-8b5b0.appspot.com",
         messagingSenderId: "885603497015",
-        appId: "1:885603497015:web:afc57007437a3166ecfbb2"
+        appId: "1:885603497015:web:afc5701234567890"
     };
 
     // Initialize Firebase
@@ -754,9 +754,9 @@
             });
     }
 
-    // New function: Update points in Firebase
-    function updateUserPoints(uid, points) {
-        db.collection("users").doc(uid).update({
+    // Fixed function: Update points in Firebase
+    function updateUserPoints(points) {
+        db.collection("users").doc(currentUser.uid).update({
             points: points
         }).catch(error => {
             console.error("Error updating points:", error);
@@ -939,8 +939,8 @@
                 resultEl.className = "lose";
             }
 
-            // Update points in Firebase
-            updateUserPoints(currentUser.uid, userPoints);
+            // Update points in Firebase (using fixed function)
+            updateUserPoints(userPoints);
             
             // Add to statement
             addToStatement(transactionType, transactionDescription, win ? winAmount : -currentBet.amount);

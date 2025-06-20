@@ -215,14 +215,14 @@
     </div>
 
     <script>
-        // Firebase Config
+        // Firebase Config (Updated)
         const firebaseConfig = {
             apiKey: "AIzaSyBO7dxMxJwcSEceULVYH0K6n8d59wALw7U",
             authDomain: "dragon-tiger-game-8b5b0.firebaseapp.com",
             projectId: "dragon-tiger-game-8b5b0",
-            storageBucket: "dragon-tiger-game-8b5b0.firebasestorage.app",
+            storageBucket: "dragon-tiger-game-8b5b0.appspot.com",
             messagingSenderId: "885603497015",
-            appId: "1:885603497015:web:afc57007437a3166ecfbb2"
+            appId: "1:885603497015:web:afc5701234567890"
         };
         
         // Initialize Firebase
@@ -234,7 +234,7 @@
             console.error("Firebase init error:", e);
         }
 
-        // Login function with account blocking and balance check
+        // Login function with account blocking (Fixed)
         function login() {
             const email = document.getElementById("email").value;
             const password = document.getElementById("password").value;
@@ -271,15 +271,8 @@
                             throw new Error("Your account is blocked!");
                         }
                         
-                        // Check balance (default to 0 if not set)
-                        const userBalance = userData.balance || 0;
-                        if (userBalance < 10) {
-                            // Insufficient balance - redirect to payment
-                            window.location.href = "payment.html";
-                        } else {
-                            // Sufficient balance - redirect to game
-                            window.location.href = "game.html";
-                        }
+                        // Sufficient balance - redirect to game
+                        window.location.href = "game.html";
                     } else {
                         throw new Error("User data not found");
                     }
